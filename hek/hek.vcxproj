@@ -152,9 +152,17 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="hek.cpp" />
+    <ClCompile Include="parser.cpp" />
+    <ClCompile Include="tokenizer.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Header.h" />
+    <ClInclude Include="ast.h" />
+    <ClInclude Include="eval.h" />
+    <ClInclude Include="parse.h" />
+    <ClInclude Include="token.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="cpp.hint" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
