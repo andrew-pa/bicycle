@@ -26,20 +26,20 @@
 // - macros
 
 int main() {
-	auto cx = std::make_shared<eval::context>(nullptr);
-	cx->bind("print", std::make_shared<eval::fn_value>(std::vector<std::string>{ "str" },
-		std::make_shared<eval::system_function_body>(std::function([](std::shared_ptr<eval::context> cx) {
+	auto cx = std::make_shared<eval::scope>(nullptr);
+	/*cx->bind("print", std::make_shared<eval::fn_value>(std::vector<std::string>{ "str" },
+		std::make_shared<eval::system_function_body>(std::function([](std::shared_ptr<eval::scope> cx) {
 			auto v = dynamic_pointer_cast<eval::str_value>(cx->binding("str"));
 			std::cout << v->value << std::endl;
 			return nullptr;
 			}))));
 	cx->bind("print_val", std::make_shared<eval::fn_value>(std::vector<std::string>{ "val" },
-		std::make_shared<eval::system_function_body>(std::function([](std::shared_ptr<eval::context> cx) {
+		std::make_shared<eval::system_function_body>(std::function([](std::shared_ptr<eval::scope> cx) {
 			auto v = cx->binding("val");
 			v->print(std::cout);
 			std::cout << std::endl;
 			return nullptr;
-			}))));
+			}))));*/
 	auto tk = tokenizer(nullptr);
 	while (true) {
 		std::string line;
@@ -52,9 +52,15 @@ int main() {
 		try {
 			auto stmt = p.next_stmt();
 			stmt->visit(&printer);
-			eval::evaluator ev(&tk.identifiers);
-			std::cout << std::endl << " = ";
-			auto res = ev.exec(cx, stmt);
+
+			eval::analyzer anl(&tk.identifiers);
+			auto code = anl.analyze(stmt);
+			std::cout << std::endl;
+			for (auto c : code) c->print(std::cout);
+			eval::interpreter intp(cx, code);
+
+			std::cout << " = ";
+			auto res = intp.run();
 			if (res != nullptr) {
 				res->print(std::cout);
 			}

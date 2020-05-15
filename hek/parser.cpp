@@ -89,15 +89,35 @@ std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 		}
 		case keyword_type::loop: {
 			tok->next();
+			t = tok->peek();
+			std::optional<size_t> name;
+			if (t.type == token::identifer) {
+				tok->next();
+				name.value() = t.data;
+			}
 			auto body = this->next_stmt();
-			return std::make_shared<ast::loop_stmt>(body);
+			return std::make_shared<ast::loop_stmt>(name, body);
 		}
-		case keyword_type::break_:
+		case keyword_type::break_: {
 			tok->next();
-			return std::make_shared<ast::break_stmt>();
-		case keyword_type::continue_:
+			t = tok->peek();
+			std::optional<size_t> name;
+			if (t.type == token::identifer) {
+				tok->next();
+				name.value() = t.data;
+			}
+			return std::make_shared<ast::break_stmt>(name);
+		}
+		case keyword_type::continue_: {
 			tok->next();
-			return std::make_shared<ast::continue_stmt>();
+			t = tok->peek();
+			std::optional<size_t> name;
+			if (t.type == token::identifer) {
+				tok->next();
+				name.value() = t.data;
+			}
+			return std::make_shared<ast::continue_stmt>(name);
+		}
 		case keyword_type::return_:
 			tok->next();
 			return std::make_shared<ast::return_stmt>(this->next_expr());

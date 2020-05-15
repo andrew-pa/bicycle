@@ -157,22 +157,47 @@ namespace ast {
 	};
 
 	struct continue_stmt : statement {
+		std::optional<size_t> name;
+		
+		continue_stmt(std::optional<size_t> name) : name(name) {}
+
 		stmt_visit_impl
 	};
 	struct break_stmt : statement {
+		std::optional<size_t> name;
+
+		break_stmt(std::optional<size_t> name) : name(name) {}
+
 		stmt_visit_impl
 	};
 
 	struct loop_stmt : statement {
+		std::optional<size_t> name;
 		std::shared_ptr<statement> body;
 
-		loop_stmt(std::shared_ptr<statement> body) : body(body) {}
+		loop_stmt(std::optional<size_t> name, std::shared_ptr<statement> body) : name(name), body(body) {}
 
 		stmt_visit_impl
 	};
 
 #undef stmt_visit_impl
 #undef expr_visit_impl
+
+	inline void print_op(op_type op, std::ostream& out) {
+		switch (op) {
+		case op_type::add: out << "+"; break;
+		case op_type::sub: out << "-"; break;
+		case op_type::mul: out << "*"; break;
+		case op_type::div: out << "/"; break;
+		case op_type::eq: out << "=="; break;
+		case op_type::neq: out << "!="; break;
+		case op_type::less: out << "<"; break;
+		case op_type::greater: out << ">"; break;
+		case op_type::less_eq: out << "<="; break;
+		case op_type::greater_eq: out << ">="; break;
+		case op_type::assign: out << "="; break;
+		}
+	}
 
 	class printer : public stmt_visitor, public expr_visitor {
 		std::ostream& out;
@@ -235,12 +260,15 @@ namespace ast {
 		}
 		virtual void visit(continue_stmt* s) override {
 			out << "continue";
+			if (s->name.has_value()) out << " " << ids->at(s->name.value());
 		}
 		virtual void visit(break_stmt* s) override {
 			out << "break";
+			if (s->name.has_value()) out << " " << ids->at(s->name.value());
 		}
 		virtual void visit(loop_stmt* s) override {
 			out << "loop ";
+			if (s->name.has_value()) out << ids->at(s->name.value()) << " ";
 			s->body->visit(this);
 		}
 		virtual void visit(return_stmt* s) override {
@@ -274,19 +302,7 @@ namespace ast {
 			out << "(";
 			x->left->visit(this);
 			out << " ";
-			switch (x->op) {
-			case op_type::add: out << "+"; break;
-			case op_type::sub: out << "-"; break;
-			case op_type::mul: out << "*"; break;
-			case op_type::div: out << "/"; break;
-			case op_type::eq: out << "=="; break;
-			case op_type::neq: out << "!="; break;
-			case op_type::less: out << "<"; break;
-			case op_type::greater: out << ">"; break;
-			case op_type::less_eq: out << "<="; break;
-			case op_type::greater_eq: out << ">="; break;
-			case op_type::assign: out << "="; break;
-			}
+			print_op(x->op, out);
 			out << " ";
 			x->right->visit(this);
 			out << ")";
