@@ -7,6 +7,7 @@
 enum class symbol_type {
 	open_paren, close_paren,
 	open_brace, close_brace,
+	open_sq, close_sq, colon,
 	semicolon, comma
 };
 

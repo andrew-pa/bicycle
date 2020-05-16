@@ -16,6 +16,9 @@ token tokenizer::next_in_stream() {
 	case '}': return token(symbol_type::close_brace);
 	case '(': return token(symbol_type::open_paren);
 	case ')': return token(symbol_type::close_paren);
+	case '[': return token(symbol_type::open_sq);
+	case ']': return token(symbol_type::close_sq);
+	case ':': return token(symbol_type::colon);
 	case ';': return token(symbol_type::semicolon);
 	case ',': return token(symbol_type::comma);
 	}

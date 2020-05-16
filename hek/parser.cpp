@@ -22,17 +22,56 @@ std::vector<size_t> parser::parse_fn_args(token t) {
 
 std::shared_ptr<ast::expression> parser::next_basic_expr() {
 	auto t = tok->next();
-	if (t.type == token::symbol && t.data == (size_t)symbol_type::open_paren) {
-		auto inside = this->next_expr();
-		auto t = tok->next();
-		if (t.type != token::symbol && t.data != (size_t)symbol_type::close_paren) {
-			error(t, "expected closing paren");
+	if (t.type == token::symbol) {
+		if (t.data == (size_t)symbol_type::open_paren) {
+			auto inside = this->next_expr();
+			auto t = tok->next();
+			if (t.type != token::symbol && t.data != (size_t)symbol_type::close_paren) {
+				error(t, "expected closing paren");
+			}
+			return inside;
 		}
-		return inside;
+		else if (t.data == (size_t)symbol_type::open_sq) {
+			std::vector<std::shared_ptr<ast::expression>> values;
+			while (true) {
+				values.push_back(this->next_expr());
+				t = tok->next();
+				if (t.type == token::symbol) {
+					if (t.data == (size_t)symbol_type::close_sq) { break; }
+					else if (t.data == (size_t)symbol_type::comma) { continue; }
+				}
+				error(t, "unexpected token in list");
+				break;
+			}
+			return std::make_shared<ast::list_value>(values);
+		}
+		else if (t.data == (size_t)symbol_type::open_brace) {
+			std::map<size_t, std::shared_ptr<ast::expression>> values;
+			while (true) {
+				t = tok->next();
+				if (t.type != token::identifer) { error(t, "unexpected token in map, expected key"); break; }
+				auto key = t.data;
+				t = tok->next();
+				if (t.type != token::symbol || t.data != (size_t)symbol_type::colon) {
+					error(t, "expected colon after key in map");
+				}
+				values[key] = this->next_expr();
+				t = tok->next();
+				if (t.type == token::symbol) {
+					if (t.data == (size_t)symbol_type::close_brace) { break; }
+					else if (t.data == (size_t)symbol_type::comma) { continue; }
+				}
+				error(t, "unexpected token in map");
+				break;
+			}
+			return std::make_shared<ast::map_value>(values);
+		}
+		else {
+			error(t, "unexpected symbol in expression");
+		}
 	}
 	else if (t.type == token::identifer) {
 		auto name = t.data;
-
 		return std::make_shared<ast::named_value>(name);
 	}
 	else if (t.type == token::number) {
@@ -78,12 +117,12 @@ std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 		case keyword_type::if_: {
 			tok->next();
 			auto cond = this->next_expr();
-			auto ift = this->next_stmt();
+			auto ift = this->next_basic_stmt();
 			std::shared_ptr<ast::statement> iff = nullptr;
 			t = tok->peek();
 			if (t.type == token::keyword && t.data == (size_t)keyword_type::else_) {
 				tok->next();
-				iff = this->next_stmt();
+				iff = this->next_basic_stmt();
 			}
 			return std::make_shared<ast::if_stmt>(cond, ift, iff);
 		}
@@ -93,9 +132,9 @@ std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 			std::optional<size_t> name;
 			if (t.type == token::identifer) {
 				tok->next();
-				name.value() = t.data;
+				name = t.data;
 			}
-			auto body = this->next_stmt();
+			auto body = this->next_basic_stmt();
 			return std::make_shared<ast::loop_stmt>(name, body);
 		}
 		case keyword_type::break_: {
@@ -104,7 +143,7 @@ std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 			std::optional<size_t> name;
 			if (t.type == token::identifer) {
 				tok->next();
-				name.value() = t.data;
+				name = t.data;
 			}
 			return std::make_shared<ast::break_stmt>(name);
 		}
@@ -114,7 +153,7 @@ std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 			std::optional<size_t> name;
 			if (t.type == token::identifer) {
 				tok->next();
-				name.value() = t.data;
+				name = t.data;
 			}
 			return std::make_shared<ast::continue_stmt>(name);
 		}

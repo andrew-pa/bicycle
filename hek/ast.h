@@ -26,6 +26,8 @@ namespace ast {
 		virtual void visit(struct integer_value* x) = 0;
 		virtual void visit(struct str_value* x) = 0;
 		virtual void visit(struct bool_value* x) = 0;
+		virtual void visit(struct list_value* x) = 0;
+		virtual void visit(struct map_value* x) = 0;
 		virtual void visit(struct binary_op* x) = 0;
 		virtual void visit(struct fn_call* x) = 0;
 		virtual void visit(struct fn_value* x) = 0;
@@ -81,6 +83,22 @@ namespace ast {
 
 		fn_value(std::vector<size_t> args, std::shared_ptr<statement> body)
 			: args(args), body(body) {}
+
+		expr_visit_impl
+	};
+
+	struct list_value : expression {
+		std::vector<std::shared_ptr<expression>> values;
+
+		list_value(std::vector<std::shared_ptr<expression>> values) : values(values) {}
+
+		expr_visit_impl
+	};
+
+	struct map_value : expression {
+		std::map<size_t, std::shared_ptr<expression>> values;
+
+		map_value(std::map<size_t, std::shared_ptr<expression>> values) : values(values) {}
 
 		expr_visit_impl
 	};
@@ -316,7 +334,30 @@ namespace ast {
 			}
 			out << ")";
 		}
-	};
+
+		// Inherited via expr_visitor
+		virtual void visit(list_value* x) override {
+			out << "[ ";
+			for (auto i = 0; i < x->values.size(); ++i) {
+				x->values[i]->visit(this);
+				if (i + 1 < x->values.size()) out << ", ";
+			}
+			out << " ]";
+		}
+
+		virtual void visit(map_value* x) override {
+			out << "{ ";
+			auto i = x->values.begin();
+			while(true) {
+				out << ids->at(i->first) << ": ";
+				i->second->visit(this);
+				i++;
+				if (i != x->values.end()) out << ", ";
+				else break;
+			}
+			out << " }";
+		}
+};
 }
 
 

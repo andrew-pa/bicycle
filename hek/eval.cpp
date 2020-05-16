@@ -67,8 +67,8 @@ void eval::analyzer::visit(ast::continue_stmt* s) {
 void eval::analyzer::visit(ast::break_stmt* s) {
 	auto end_mark = 0;
 	if (s->name.has_value()) {
-		for (auto i = loop_marker_stack.size() - 1; i >= 0; --i) {
-			auto loop = loop_marker_stack[loop_marker_stack.size() - 1];
+		for (int i = loop_marker_stack.size() - 1; i >= 0; --i) {
+			auto loop = loop_marker_stack[i];
 			if (std::get<0>(loop).has_value() && std::get<0>(loop).value() == s->name.value()) {
 				end_mark = std::get<2>(loop);
 				break;
@@ -116,6 +116,26 @@ void eval::analyzer::visit(ast::bool_value* x) {
 	instrs.push_back(std::make_shared<literal_instr>(v));
 }
 
+void eval::analyzer::visit(ast::list_value* x) {
+	auto v = std::make_shared<list_value>();
+	instrs.push_back(std::make_shared<literal_instr>(v));
+	for (auto v : x->values) {
+		v->visit(this);
+		instrs.push_back(std::make_shared<append_list_instr>());
+	}
+}
+
+void eval::analyzer::visit(ast::map_value* x) {
+	auto v = std::make_shared<map_value>();
+	instrs.push_back(std::make_shared<literal_instr>(v));
+	for (auto v : x->values) {
+		auto n = std::make_shared<str_value>(ids->at(v.first));
+		instrs.push_back(std::make_shared<literal_instr>(n));
+		v.second->visit(this);
+		instrs.push_back(std::make_shared<set_key_instr>());
+	}
+}
+
 void eval::analyzer::visit(ast::binary_op* x) {
 	if (x->op == op_type::assign) {
 		auto name = std::dynamic_pointer_cast<ast::named_value>(x->left)->identifier;
@@ -145,3 +165,4 @@ void eval::analyzer::visit(ast::fn_value* x) {
 	auto fn = std::make_shared<fn_value>(arg_names, anl.analyze(x->body));
 	instrs.push_back(std::make_shared<literal_instr>(fn));
 }
+

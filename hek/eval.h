@@ -58,6 +58,61 @@ namespace eval {
 		}
 	};
 
+	struct list_value : public value {
+		std::vector<std::shared_ptr<value>> values;
+
+		list_value(std::vector<std::shared_ptr<value>> values = {}) : values(values) {}
+
+		void print(std::ostream& out) {
+			out << "[ ";
+			for (auto i = 0; i < values.size(); ++i) {
+				values[i]->print(out);
+				if (i + 1 < values.size()) out << ", ";
+			}
+			out << " ]";
+		}
+
+		bool equal(std::shared_ptr<value> other) {
+			auto lv = std::dynamic_pointer_cast<list_value>(other);
+			if (lv != nullptr) {
+				if (lv->values.size() != values.size()) return false;
+				for (auto i = 0; i < values.size(); ++i) {
+					if (!values[i]->equal(lv->values[i])) return false;
+				}
+				return true;
+			}
+			else return false;
+		}
+	};
+
+	struct map_value : public value {
+		std::map<std::string, std::shared_ptr<value>> values;
+
+		map_value(std::map<std::string, std::shared_ptr<value>> v = {}) : values(v) {}
+
+		void print(std::ostream& out) {
+			out << "{ ";
+			auto i = values.begin();
+			while(i != values.end()) {
+				out << i->first << ": ";
+				i->second->print(out);
+				i++;
+				if (i != values.end()) out << ", ";
+				else break;
+			}
+			out << " }";
+		}
+
+		bool equal(std::shared_ptr<value> other) {
+			auto mv = std::dynamic_pointer_cast<map_value>(other);
+			if (mv != nullptr) {
+				// reference equality really isn't what we want here
+				return &*mv == this;
+			}
+			return false;
+		}
+	};
+
 	struct instr {
 		virtual void print(std::ostream& out) = 0;
 		virtual void exec(struct interpreter*) = 0;
@@ -321,17 +376,42 @@ namespace eval {
 		void print(std::ostream& out) override { out << "ret" << std::endl; }
 	};
 
-	struct system_function_body : public ast::statement {
-		std::function<std::shared_ptr<value>(std::shared_ptr<scope>)> f;
+	struct append_list_instr : public instr {
+		void exec(interpreter* intp) override {
+			auto v = intp->stack.top(); intp->stack.pop();
+			auto list = std::dynamic_pointer_cast<list_value>(intp->stack.top());
+			list->values.push_back(v);
+		}
+		void print(std::ostream& out) override { out << "append" << std::endl; }
+	};
 
-		system_function_body(std::function<std::shared_ptr<value>(std::shared_ptr<scope>)> f)
+	struct set_key_instr : public instr {
+		void exec(interpreter* intp) override {
+			auto v = intp->stack.top(); intp->stack.pop();
+			auto n = std::dynamic_pointer_cast<str_value>(intp->stack.top()); intp->stack.pop();
+			if (n == nullptr) throw std::runtime_error("expected string key");
+			auto map = std::dynamic_pointer_cast<map_value>(intp->stack.top());
+			map->values[n->value] = v;
+		}
+		void print(std::ostream& out) override { out << "set key" << std::endl; }
+	};
+
+	struct system_instr : public instr {
+		std::function<std::shared_ptr<value>(interpreter*)> f;
+
+		system_instr(std::function<std::shared_ptr<value>(interpreter*)> f)
 			: f(f) {}
 
-		virtual void visit(ast::stmt_visitor* v) override {
-			/*auto ev = dynamic_cast<evaluator*>(v);
-			if (ev == nullptr) throw std::runtime_error("system_function_body used outside of evaluation");
-			ev->exec_system(f);*/
+
+		// Inherited via instr
+		virtual void print(std::ostream& out) override {
+			out << "system" << std::endl;
 		}
+
+		virtual void exec(interpreter* intrp) override {
+			f(intrp);
+		}
+
 	};
 
 	class analyzer : public ast::stmt_visitor, public ast::expr_visitor {
@@ -367,6 +447,8 @@ namespace eval {
 		virtual void visit(ast::integer_value* x) override;
 		virtual void visit(ast::str_value* x) override;
 		virtual void visit(ast::bool_value* x) override;
+		virtual void visit(ast::list_value* x) override;
+		virtual void visit(ast::map_value* x) override;
 		virtual void visit(ast::binary_op* x) override;
 		virtual void visit(ast::fn_call* x) override;
 		virtual void visit(ast::fn_value* x) override;
