@@ -104,11 +104,50 @@ namespace ast {
 		expr_visit_impl
 	};
 
+	static const std::map<op_type, size_t> operator_precendence = {
+		{ op_type::add, 14 },
+		{ op_type::sub, 14 },
+		{ op_type::mul, 15 },
+		{ op_type::div, 15 },
+
+		{ op_type::eq, 11 },
+		{ op_type::neq, 11 },
+
+		{ op_type::less, 12 },
+		{ op_type::greater, 12 },
+		{ op_type::less_eq, 12 },
+		{ op_type::greater_eq, 12 },
+
+		{ op_type::assign, 3 },
+		{ op_type::dot, 20 },
+	};
+
 	struct binary_op : expression {
 		std::shared_ptr<expression> left, right;
 		op_type op;
 
-		binary_op(op_type op, std::shared_ptr<expression> l, std::shared_ptr<expression> r) : op(op), left(l), right(r) {}
+		binary_op(op_type op, std::shared_ptr<expression> l, std::shared_ptr<expression> r) {
+			auto rightop = std::dynamic_pointer_cast<ast::binary_op>(r);
+			if (rightop != nullptr) {
+				auto oppd = ast::operator_precendence.at(op);
+				auto ropd = ast::operator_precendence.at(rightop->op);
+				if (oppd > ropd) {
+					auto a = l, b = rightop->left, c = rightop->right;
+					this->op = rightop->op;
+					left = std::make_shared<ast::binary_op>(op, a, b);
+					right = c;
+					return;
+				}
+				else if(op == rightop->op && op == op_type::dot) {
+					this->op = op;
+					left = std::make_shared<ast::binary_op>(op, l, rightop->left);
+					right = rightop->right;
+					return;
+				}
+			}
+			this->op = op;
+			left = l; right = r;
+		}
 
 		expr_visit_impl
 	};

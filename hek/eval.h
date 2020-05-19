@@ -190,9 +190,23 @@ namespace eval {
 		interpreter(std::shared_ptr<scope> global_scope, std::vector<std::shared_ptr<instr>> code)
 			: global_scope(global_scope), current_scope(std::make_shared<scope>(global_scope)), pc(0), stack(), code(code) {}
 
+		void debug_print_state() {
+			std::cout << "stack [";
+			if(stack.size() > 0) stack.top()->print(std::cout);
+			std::cout << "] scope {";
+			for (auto b : current_scope->bindings) {
+				std::cout << b.first << "=";
+				b.second->print(std::cout);
+				std::cout << " ";
+			}
+			std::cout << "} cur instr =";
+			code[pc]->print(std::cout);
+		}
+
 		std::shared_ptr<value> run() {
 			pc = 0;
 			while (pc < code.size()) {
+				//debug_print_state();
 				code[pc]->exec(this);
 				pc++;
 			}
@@ -445,7 +459,7 @@ namespace eval {
 			auto v = intp->stack.top(); intp->stack.pop();
 			auto n = std::dynamic_pointer_cast<str_value>(intp->stack.top()); intp->stack.pop();
 			if (n == nullptr) throw std::runtime_error("expected string key");
-			auto map = std::dynamic_pointer_cast<map_value>(intp->stack.top()); intp->stack.pop();
+			auto map = std::dynamic_pointer_cast<map_value>(intp->stack.top());
 			map->values[n->value] = v;
 		}
 		void print(std::ostream& out) override { out << "set key" << std::endl; }
