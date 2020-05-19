@@ -19,9 +19,10 @@
 // TODO:
 // + function definition
 // + system functions
-// - lists
-// - hashmaps
+// + lists
+// + hashmaps
 // + multiple files
+// - dot operator
 // - tests/cmake
 // - macros
 // - closures
@@ -62,6 +63,7 @@ macro map!
 	[{}] => { map_empty() };
 
 */
+
 
 int main() {
 	auto cx = std::make_shared<eval::scope>(nullptr);

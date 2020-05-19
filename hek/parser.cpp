@@ -215,8 +215,18 @@ std::shared_ptr<ast::expression> parser::next_expr() {
 				else if (t.data == (size_t)symbol_type::close_paren) break;
 			}
 			error(t, "expected either a comma or closing paren in fn call");
+			break;
 		}
 		return std::make_shared<ast::fn_call>(x, args);
+	}
+	else if (t.type == token::symbol && t.data == (size_t)symbol_type::open_sq) {
+		tok->next();
+		auto index = this->next_expr();
+		t = tok->next();
+		if (t.type != token::symbol && t.data != (size_t)symbol_type::close_sq) {
+			error(t, "expected closing square bracket for index");
+		}
+		return std::make_shared<ast::index_into>(x, index);
 	}
 
 	return x;

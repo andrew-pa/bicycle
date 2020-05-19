@@ -138,14 +138,44 @@ void eval::analyzer::visit(ast::map_value* x) {
 
 void eval::analyzer::visit(ast::binary_op* x) {
 	if (x->op == op_type::assign) {
+		auto path = std::dynamic_pointer_cast<ast::binary_op>(x->left);
+		if (path != nullptr && path->op == op_type::dot) {
+			path->left->visit(this);
+			auto name = ids->at(std::dynamic_pointer_cast<ast::named_value>(path->right)->identifier);
+			instrs.push_back(std::make_shared<literal_instr>(std::make_shared<str_value>(name)));
+			x->right->visit(this);
+			instrs.push_back(std::make_shared<set_key_instr>());
+			return;
+		}
+		auto index = std::dynamic_pointer_cast<ast::index_into>(x->left);
+		if (index != nullptr) {
+			index->collection->visit(this);
+			index->index->visit(this);
+			x->right->visit(this);
+			instrs.push_back(std::make_shared<set_index_instr>());
+			return;
+		}
 		auto name = std::dynamic_pointer_cast<ast::named_value>(x->left)->identifier;
 		x->right->visit(this);
 		instrs.push_back(std::make_shared<set_binding_instr>(ids->at(name)));
 		return;
 	}
+	else if (x->op == op_type::dot) {
+		x->left->visit(this);
+		auto name = ids->at(std::dynamic_pointer_cast<ast::named_value>(x->right)->identifier);
+		instrs.push_back(std::make_shared<literal_instr>(std::make_shared<str_value>(name)));
+		instrs.push_back(std::make_shared<get_key_instr>());
+		return;
+	}
 	x->left->visit(this);
 	x->right->visit(this);
 	instrs.push_back(std::make_shared<bin_op_instr>(x->op));
+}
+
+void eval::analyzer::visit(ast::index_into* x) {
+	x->collection->visit(this);
+	x->index->visit(this);
+	instrs.push_back(std::make_shared<get_index_instr>());
 }
 
 void eval::analyzer::visit(ast::fn_call* x) {

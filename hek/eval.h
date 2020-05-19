@@ -238,7 +238,7 @@ namespace eval {
 	struct get_binding_instr : public instr {
 		std::string name;
 		get_binding_instr(const std::string& name) : name(name) {}
-		void print(std::ostream& out) override { out << "get " << name << std::endl; }
+		void print(std::ostream& out) override { out << "get~" << name << std::endl; }
 		void exec(interpreter* intp) override {
 			intp->stack.push(intp->current_scope->binding(name));
 		}
@@ -247,7 +247,7 @@ namespace eval {
 	struct set_binding_instr : public instr {
 		std::string name;
 		set_binding_instr(const std::string& name) : name(name) {}
-		void print(std::ostream& out) override { out << "set " << name << std::endl; }
+		void print(std::ostream& out) override { out << "set~" << name << std::endl; }
 		void exec(interpreter* intp) override {
 			intp->current_scope->binding(name, intp->stack.top());
 			intp->stack.pop();
@@ -257,7 +257,7 @@ namespace eval {
 	struct bind_instr : public instr {
 		std::string name;
 		bind_instr(const std::string& name) : name(name) {}
-		void print(std::ostream& out) override { out << "bind " << name << std::endl; }
+		void print(std::ostream& out) override { out << "bind~" << name << std::endl; }
 		void exec(interpreter* intp) override {
 			intp->current_scope->bind(name, intp->stack.top());
 			intp->stack.pop();
@@ -376,6 +376,51 @@ namespace eval {
 		void print(std::ostream& out) override { out << "ret" << std::endl; }
 	};
 
+	struct get_index_instr : public instr {
+		void exec(interpreter* intp) override {
+			auto ix = intp->stack.top(); intp->stack.pop();
+			auto list = std::dynamic_pointer_cast<list_value>(intp->stack.top()); intp->stack.pop();
+			if (list != nullptr) {
+				auto i = std::dynamic_pointer_cast<int_value>(ix);
+				if (i == nullptr) throw std::runtime_error("expected int index to list");
+				intp->stack.push(list->values[i->value]);
+				return;
+			}
+			auto map = std::dynamic_pointer_cast<map_value>(intp->stack.top());
+			if (map != nullptr) {
+				auto n = std::dynamic_pointer_cast<str_value>(ix);
+				if (n == nullptr) throw std::runtime_error("expected string key");
+				intp->stack.push(map->values[n->value]);
+				return;
+			}
+			throw std::runtime_error("attempted to index unindexable value");
+		}
+		void print(std::ostream& out) override { out << "index" << std::endl; }
+	};
+
+	struct set_index_instr : public instr {
+		void exec(interpreter* intp) override {
+			auto v = intp->stack.top(); intp->stack.pop();
+			auto ix = intp->stack.top(); intp->stack.pop();
+			auto list = std::dynamic_pointer_cast<list_value>(intp->stack.top()); intp->stack.pop();
+			if (list != nullptr) {
+				auto i = std::dynamic_pointer_cast<int_value>(ix);
+				if (i == nullptr) throw std::runtime_error("expected int index to list");
+				list->values[i->value] = v;
+				return;
+			}
+			auto map = std::dynamic_pointer_cast<map_value>(intp->stack.top());
+			if (map != nullptr) {
+				auto n = std::dynamic_pointer_cast<str_value>(ix);
+				if (n == nullptr) throw std::runtime_error("expected string key");
+				map->values[n->value] = v;
+				return;
+			}
+			throw std::runtime_error("attempted to index unindexable value");
+		}
+		void print(std::ostream& out) override { out << "set index" << std::endl; }
+	};
+
 	struct append_list_instr : public instr {
 		void exec(interpreter* intp) override {
 			auto v = intp->stack.top(); intp->stack.pop();
@@ -385,12 +430,22 @@ namespace eval {
 		void print(std::ostream& out) override { out << "append" << std::endl; }
 	};
 
+	struct get_key_instr : public instr {
+		void exec(interpreter* intp) override {
+			auto n = std::dynamic_pointer_cast<str_value>(intp->stack.top()); intp->stack.pop();
+			if (n == nullptr) throw std::runtime_error("expected string key");
+			auto map = std::dynamic_pointer_cast<map_value>(intp->stack.top()); intp->stack.pop();
+			intp->stack.push(map->values[n->value]);
+		}
+		void print(std::ostream& out) override { out << "get key" << std::endl; }
+	};
+
 	struct set_key_instr : public instr {
 		void exec(interpreter* intp) override {
 			auto v = intp->stack.top(); intp->stack.pop();
 			auto n = std::dynamic_pointer_cast<str_value>(intp->stack.top()); intp->stack.pop();
 			if (n == nullptr) throw std::runtime_error("expected string key");
-			auto map = std::dynamic_pointer_cast<map_value>(intp->stack.top());
+			auto map = std::dynamic_pointer_cast<map_value>(intp->stack.top()); intp->stack.pop();
 			map->values[n->value] = v;
 		}
 		void print(std::ostream& out) override { out << "set key" << std::endl; }
@@ -450,6 +505,7 @@ namespace eval {
 		virtual void visit(ast::list_value* x) override;
 		virtual void visit(ast::map_value* x) override;
 		virtual void visit(ast::binary_op* x) override;
+		virtual void visit(ast::index_into* x) override;
 		virtual void visit(ast::fn_call* x) override;
 		virtual void visit(ast::fn_value* x) override;
 	};

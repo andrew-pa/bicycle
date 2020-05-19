@@ -14,7 +14,7 @@ enum class symbol_type {
 enum class op_type {
 	add, sub, mul, div,
 	eq, neq, less, greater, less_eq, greater_eq,
-	assign,
+	assign, dot
 };
 
 enum class keyword_type {
@@ -50,6 +50,7 @@ const std::map<std::string, op_type> operators = {
 	  { "<=", op_type::less_eq },
 	  { ">=", op_type::greater_eq },
 	  { "=", op_type::assign },
+	  { ".", op_type::dot },
 };
 const std::map<std::string, keyword_type> keywords = {
 	{ "fn", keyword_type::fn },

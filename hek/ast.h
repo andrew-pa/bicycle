@@ -30,6 +30,7 @@ namespace ast {
 		virtual void visit(struct map_value* x) = 0;
 		virtual void visit(struct binary_op* x) = 0;
 		virtual void visit(struct fn_call* x) = 0;
+		virtual void visit(struct index_into* x) = 0;
 		virtual void visit(struct fn_value* x) = 0;
 	};
 
@@ -108,6 +109,15 @@ namespace ast {
 		op_type op;
 
 		binary_op(op_type op, std::shared_ptr<expression> l, std::shared_ptr<expression> r) : op(op), left(l), right(r) {}
+
+		expr_visit_impl
+	};
+
+	struct index_into : expression {
+		std::shared_ptr<expression> collection;
+		std::shared_ptr<expression> index;
+
+		index_into(std::shared_ptr<expression> col, std::shared_ptr<expression> ix) : collection(col), index(ix) {}
 
 		expr_visit_impl
 	};
@@ -214,6 +224,7 @@ namespace ast {
 		case op_type::less_eq: out << "<="; break;
 		case op_type::greater_eq: out << ">="; break;
 		case op_type::assign: out << "="; break;
+		case op_type::dot: out << "."; break;
 		}
 	}
 
@@ -324,6 +335,12 @@ namespace ast {
 			out << " ";
 			x->right->visit(this);
 			out << ")";
+		}
+		virtual void visit(index_into* x) override {
+			x->collection->visit(this);
+			out << "[";
+			x->index->visit(this);
+			out << "]";
 		}
 		virtual void visit(fn_call* x) override {
 			x->fn->visit(this);
