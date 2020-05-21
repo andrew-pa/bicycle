@@ -8,7 +8,7 @@ enum class symbol_type {
 	open_paren, close_paren,
 	open_brace, close_brace,
 	open_sq, close_sq, colon,
-	semicolon, comma
+	semicolon, comma, dollar, thick_arrow
 };
 
 enum class op_type {
@@ -18,7 +18,7 @@ enum class op_type {
 };
 
 enum class keyword_type {
-	fn, loop, break_, continue_, return_, if_, else_, let, true_, false_
+	fn, loop, break_, continue_, return_, if_, else_, let, true_, false_, macro
 };
 
 struct token {
@@ -36,6 +36,28 @@ struct token {
 		: type(op), data((size_t)data) {}
 	token(keyword_type data)
 		: type(op), data((size_t)data) {}
+
+	inline bool is_keyword(keyword_type t) {
+		return type == keyword && data == (size_t)t;
+	}
+	inline bool is_number() {
+		return type == number;
+	}
+	inline bool is_op(op_type t) {
+		return type == op && data == (size_t)t;
+	}
+	inline bool is_id() {
+		return type == identifer;
+	}
+	inline bool is_symbol(symbol_type t) {
+		return type == symbol && data == (size_t)t;
+	}
+	inline bool is_eof() {
+		return type == eof;
+	}
+	inline bool is_str() {
+		return type == str;
+	}
 };
 
 const std::map<std::string, op_type> operators = {
@@ -63,6 +85,7 @@ const std::map<std::string, keyword_type> keywords = {
 	{ "else", keyword_type::else_ },
 	{ "true", keyword_type::true_ },
 	{ "false", keyword_type::false_ },
+	{ "macro", keyword_type::macro },
 };
 
 class tokenizer {

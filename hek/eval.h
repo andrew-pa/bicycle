@@ -393,14 +393,15 @@ namespace eval {
 	struct get_index_instr : public instr {
 		void exec(interpreter* intp) override {
 			auto ix = intp->stack.top(); intp->stack.pop();
-			auto list = std::dynamic_pointer_cast<list_value>(intp->stack.top()); intp->stack.pop();
+			auto top = intp->stack.top(); intp->stack.pop();
+			auto list = std::dynamic_pointer_cast<list_value>(top);
 			if (list != nullptr) {
 				auto i = std::dynamic_pointer_cast<int_value>(ix);
 				if (i == nullptr) throw std::runtime_error("expected int index to list");
 				intp->stack.push(list->values[i->value]);
 				return;
 			}
-			auto map = std::dynamic_pointer_cast<map_value>(intp->stack.top());
+			auto map = std::dynamic_pointer_cast<map_value>(top);
 			if (map != nullptr) {
 				auto n = std::dynamic_pointer_cast<str_value>(ix);
 				if (n == nullptr) throw std::runtime_error("expected string key");

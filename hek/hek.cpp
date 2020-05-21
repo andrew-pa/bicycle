@@ -22,15 +22,21 @@
 // + lists
 // + hashmaps
 // + multiple files
-// - dot operator
+// + dot operator
 // - tests/cmake
 // - macros
 // - closures
 
 /*
+	<macro> := macro /name/ <macro-case>, + ;
+	<macro-case> := [ <pattern>* ] => { <code> }
+	<pattern> := /token/ | $/name/:<type> | $/name/*
+*/
 
-macro for
-	[($init:stmt; $check:expr; $incr:stmt) $body:stmt] => {
+/*
+
+macro for:stmt
+	($init:stmt; $check:expr; $incr:stmts) $body:stmts => {
 		$init;
 		loop {
 			if $check { break; };
@@ -39,31 +45,21 @@ macro for
 		};
 	};
 
-macro cond
-	[{ $test:expr => $body:stmt ; $rest }] => {
+macro cond:stmt
+	{ $test:expr => $body:stmt ; $rest* } => {
 		if $test { $body } else cond { $rest }
 	},
-	[{ else => $body:stmt }] => {
+	{ else => $body:stmt } => {
 		$body:stmt
 	},
-	[{ }] => {
+	{ } => {
 		{}
 	};
 
-macro list!
-	[[ $val:expr, $rest ]] => {
-		list_cons($val, list![$rest])
-	},
-	[[]] => { list_empty() };
-
-macro map!
-	[{ $key:id : $val:expr, $rest }] => {
-		map_insert(map![$rest], stringify!(key), val)
-	},
-	[{}] => { map_empty() };
+macro mad:expr
+	$a:expr + $b:expr * $c:expr => { $a + ($b * $c) };
 
 */
-
 
 int main() {
 	auto cx = std::make_shared<eval::scope>(nullptr);

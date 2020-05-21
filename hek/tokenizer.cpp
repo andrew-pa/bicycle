@@ -21,6 +21,11 @@ token tokenizer::next_in_stream() {
 	case ':': return token(symbol_type::colon);
 	case ';': return token(symbol_type::semicolon);
 	case ',': return token(symbol_type::comma);
+	case '$': return token(symbol_type::dollar);
+	case '=': if (_in->peek() == '>') {
+		_in->get();
+		return token(symbol_type::thick_arrow);
+	}
 	}
 
 	if (isdigit(ch)) {

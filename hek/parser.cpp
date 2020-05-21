@@ -80,13 +80,13 @@ std::shared_ptr<ast::expression> parser::next_basic_expr() {
 	else if (t.type == token::str) {
 		return std::make_shared<ast::str_value>(tok->string_literals[t.data]);
 	}
-	else if (t.type == token::keyword && t.data == (size_t)keyword_type::true_) {
+	else if (t.is_keyword(keyword_type::true_)) {
 		return std::make_shared<ast::bool_value>(true);
 	}
-	else if (t.type == token::keyword && t.data == (size_t)keyword_type::false_) {
+	else if (t.is_keyword(keyword_type::false_)) {
 		return std::make_shared<ast::bool_value>(false);
 	}
-	else if (t.type == token::keyword && t.data == (size_t)keyword_type::fn) {
+	else if (t.is_keyword(keyword_type::fn)) {
 		t = tok->next();
 		auto arg_names = this->parse_fn_args(t);
 		auto body = this->next_basic_stmt();
@@ -99,10 +99,10 @@ std::shared_ptr<ast::expression> parser::next_basic_expr() {
 
 std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 	auto t = tok->peek();
-	if (t.type == token::symbol && t.data == (size_t)symbol_type::open_brace) {
+	if (t.is_symbol(symbol_type::open_brace)) {
 		tok->next();
 		t = tok->peek();
-		if (t.type == token::symbol && t.data == (size_t)symbol_type::close_brace) {
+		if (t.is_symbol(symbol_type::close_brace)) {
 			return std::make_shared<ast::block_stmt>(nullptr);
 		}
 		auto body = this->next_stmt();
@@ -120,7 +120,7 @@ std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 			auto ift = this->next_basic_stmt();
 			std::shared_ptr<ast::statement> iff = nullptr;
 			t = tok->peek();
-			if (t.type == token::keyword && t.data == (size_t)keyword_type::else_) {
+			if (t.is_keyword(keyword_type::else_)) {
 				tok->next();
 				iff = this->next_basic_stmt();
 			}
@@ -130,7 +130,7 @@ std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 			tok->next();
 			t = tok->peek();
 			std::optional<size_t> name;
-			if (t.type == token::identifer) {
+			if (t.is_id()) {
 				tok->next();
 				name = t.data;
 			}
@@ -141,7 +141,7 @@ std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 			tok->next();
 			t = tok->peek();
 			std::optional<size_t> name;
-			if (t.type == token::identifer) {
+			if (t.is_id()) {
 				tok->next();
 				name = t.data;
 			}
@@ -151,7 +151,7 @@ std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 			tok->next();
 			t = tok->peek();
 			std::optional<size_t> name;
-			if (t.type == token::identifer) {
+			if (t.is_id()) {
 				tok->next();
 				name = t.data;
 			}
@@ -163,12 +163,12 @@ std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 		case keyword_type::let: {
 			tok->next();
 			t = tok->next();
-			if (t.type != token::identifer) {
+			if (!t.is_id()) {
 				error(t, "expected name");
 			}
 			auto id = t.data;
 			t = tok->next();
-			if (t.type != token::op && t.data != (size_t)op_type::eq) {
+			if (!t.is_op(op_type::eq)) {
 				error(t, "expected = in let stmt");
 			}
 			return std::make_shared<ast::let_stmt>(id, this->next_expr());
@@ -176,7 +176,7 @@ std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 		case keyword_type::fn: {
 			tok->next();
 			t = tok->next();
-			if (t.type != token::identifer) {
+			if (!t.is_id()) {
 				error(t, "expected name");
 			}
 			auto name = t.data;
@@ -199,44 +199,111 @@ std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 std::shared_ptr<ast::expression> parser::next_expr() {
 	auto x = this->next_basic_expr();
 
-	auto t = tok->peek();
-	if (t.type == token::op) {
-		tok->next();
-		return std::make_shared<ast::binary_op>((op_type)t.data, x, this->next_expr());
-	}
-	else if (t.type == token::symbol && t.data == (size_t)symbol_type::open_paren) {
-		tok->next();
-		std::vector<std::shared_ptr<ast::expression>> args;
-		while (true) {
-			args.push_back(this->next_expr());
-			t = tok->next();
-			if (t.type == token::symbol) {
-				if (t.data == (size_t)symbol_type::comma) continue;
-				else if (t.data == (size_t)symbol_type::close_paren) break;
+	while (true) {
+		auto t = tok->peek();
+		if (t.type == token::op) {
+			tok->next();
+			return std::make_shared<ast::binary_op>((op_type)t.data, x, this->next_expr());
+		}
+		else if (t.is_symbol(symbol_type::open_paren)) {
+			tok->next();
+			std::vector<std::shared_ptr<ast::expression>> args;
+			while (true) {
+				args.push_back(this->next_expr());
+				t = tok->next();
+				if (t.type == token::symbol) {
+					if (t.data == (size_t)symbol_type::comma) continue;
+					else if (t.data == (size_t)symbol_type::close_paren) break;
+				}
+				error(t, "expected either a comma or closing paren in fn call");
+				break;
 			}
-			error(t, "expected either a comma or closing paren in fn call");
-			break;
+			x = std::make_shared<ast::fn_call>(x, args);
 		}
-		return std::make_shared<ast::fn_call>(x, args);
-	}
-	else if (t.type == token::symbol && t.data == (size_t)symbol_type::open_sq) {
-		tok->next();
-		auto index = this->next_expr();
-		t = tok->next();
-		if (t.type != token::symbol && t.data != (size_t)symbol_type::close_sq) {
-			error(t, "expected closing square bracket for index");
+		else if (t.is_symbol(symbol_type::open_sq)) {
+			tok->next();
+			auto index = this->next_expr();
+			t = tok->next();
+			if (!t.is_symbol(symbol_type::close_sq)) {
+				error(t, "expected closing square bracket for index");
+			}
+			x = std::make_shared<ast::index_into>(x, index);
 		}
-		return std::make_shared<ast::index_into>(x, index);
+		else break;
 	}
 
 	return x;
 }
 
 std::shared_ptr<ast::statement> parser::next_stmt() {
+	auto t = tok->peek();
+	/*if(t.is_keyword(keyword_type::macro)) {
+		tok->next();
+		t = tok->next();
+		if (!t.is_id()) {
+			error(t, "expected name for macro");
+			return nullptr;
+		}
+		auto name = t.data;
+		t = tok->next();
+		if (!t.is_symbol(symbol_type::colon)) {
+			error(t, "expected colon after macro name");
+			return nullptr;
+		}
+		t = tok->next();
+		if (!t.is_id()) {
+			error(t, "expected macro type");
+			return nullptr;
+		}
+		auto type = 0;
+		if (expr_tok_id.has_value() && t.data == expr_tok_id.value()) type = macro_def::expr;
+		else if (stmt_tok_id.has_value() && t.data == stmt_tok_id.value()) type = macro_def::stmt;
+		else {
+			error(t, "unexpected macro type " + tok->identifiers[t.data]);
+			return nullptr;
+		}
+
+		std::vector<macro_rule> rules;
+		while (true) {
+			macro_rule rule;
+			while (true) {
+				t = tok->next();
+				if (t.is_symbol(symbol_type::thick_arrow)) {
+					break;
+				}
+				else if(t.is_symbol(symbol_type::dollar)) {
+					t = tok->next();
+					if (!t.is_id()) {
+						error(t, "expected name for macro pattern");
+						return nullptr;
+					}
+					auto name = t.data;
+					t = tok->next();
+					if (!t.is_symbol(symbol_type::colon)) {
+						error(t, "expected colon after macro pattern name");
+						return nullptr;
+					}
+					t = tok->next();
+					if (!t.is_id()) {
+						error(t, "expected macro pattern type");
+						return nullptr;
+					}
+				}
+				else {
+					rule.parts.push_back(macro_pattern_token(t));
+				}
+			}
+
+			t = tok->peek();
+			if (t.is_symbol(symbol_type::semicolon)) {
+				tok->next(); break;
+			}
+		}
+	}*/
 	auto s = this->next_basic_stmt();
 
-	auto t = tok->peek();
-	if (t.type == token::symbol && t.data == (size_t)symbol_type::semicolon) {
+	t = tok->peek();
+	if (t.is_symbol(symbol_type::semicolon)) {
 		tok->next();
 		std::shared_ptr<ast::statement> next = nullptr;
 		t = tok->peek();
