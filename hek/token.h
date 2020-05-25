@@ -35,7 +35,7 @@ struct token {
 	token(op_type data)
 		: type(op), data((size_t)data) {}
 	token(keyword_type data)
-		: type(op), data((size_t)data) {}
+		: type(keyword), data((size_t)data) {}
 
 	inline bool is_keyword(keyword_type t) {
 		return type == keyword && data == (size_t)t;

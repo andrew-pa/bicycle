@@ -157,6 +157,7 @@ namespace eval {
 		std::map<std::string, std::shared_ptr<value>> bindings;
 
 		scope(std::shared_ptr<scope> parent) : parent(parent), bindings() {}
+		scope(std::string name, std::shared_ptr<scope> parent) : parent(parent), bindings() {}
 
 		std::shared_ptr<value> binding(const std::string& name) {
 			auto f = bindings.find(name);
@@ -188,7 +189,7 @@ namespace eval {
 		std::stack<std::shared_ptr<value>> stack;
 
 		interpreter(std::shared_ptr<scope> global_scope, std::vector<std::shared_ptr<instr>> code)
-			: global_scope(global_scope), current_scope(std::make_shared<scope>(global_scope)), pc(0), stack(), code(code) {}
+			: global_scope(global_scope), current_scope(global_scope), pc(0), stack(), code(code) {}
 
 		void debug_print_state() {
 			std::cout << "stack [";

@@ -168,7 +168,7 @@ std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 			}
 			auto id = t.data;
 			t = tok->next();
-			if (!t.is_op(op_type::eq)) {
+			if (!t.is_op(op_type::assign)) {
 				error(t, "expected = in let stmt");
 			}
 			return std::make_shared<ast::let_stmt>(id, this->next_expr());
@@ -208,16 +208,20 @@ std::shared_ptr<ast::expression> parser::next_expr() {
 		else if (t.is_symbol(symbol_type::open_paren)) {
 			tok->next();
 			std::vector<std::shared_ptr<ast::expression>> args;
-			while (true) {
-				args.push_back(this->next_expr());
-				t = tok->next();
-				if (t.type == token::symbol) {
-					if (t.data == (size_t)symbol_type::comma) continue;
-					else if (t.data == (size_t)symbol_type::close_paren) break;
+			t = tok->peek();
+			if (!t.is_symbol(symbol_type::close_paren)) {
+				while (true) {
+					args.push_back(this->next_expr());
+					t = tok->next();
+					if (t.type == token::symbol) {
+						if (t.data == (size_t)symbol_type::comma) continue;
+						else if (t.data == (size_t)symbol_type::close_paren) break;
+					}
+					error(t, "expected either a comma or closing paren in fn call");
+					break;
 				}
-				error(t, "expected either a comma or closing paren in fn call");
-				break;
 			}
+			else tok->next();
 			x = std::make_shared<ast::fn_call>(x, args);
 		}
 		else if (t.is_symbol(symbol_type::open_sq)) {

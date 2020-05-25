@@ -4,12 +4,17 @@
 token tokenizer::next_in_stream() {
 	if (!_in) return token(token::eof, 0);
 	auto ch = _in->get();
-	if (ch < 0) return token(token::eof, 0);
+	if (ch < 0)
+		return token(token::eof, 0);
 
 	while (isspace(ch)) {
 		if (ch == '\n') line_number++;
 		ch = _in->get();
+		if (ch < 0)
+			return token(token::eof, 0);
 	}
+	
+
 
 	switch (ch) {
 	case '{': return token(symbol_type::open_brace);
@@ -40,6 +45,7 @@ token tokenizer::next_in_stream() {
 		while (_in && _in->peek() != '"') {
 			ch = _in->get();
 			if (ch > 0) str += ch;
+			else break;
 		}
 		_in->get();
 		auto id = string_literals.size();
@@ -52,6 +58,7 @@ token tokenizer::next_in_stream() {
 		while (_in && !isalnum(_in->peek()) && !isspace(_in->peek())) {
 			ch = _in->get();
 			if (ch > 0) op += ch;
+			else break;
 		}
 		auto opt = operators.find(op);
 		if (opt != operators.end()) {
@@ -67,6 +74,7 @@ token tokenizer::next_in_stream() {
 		while (_in && (isalnum(_in->peek()) || _in->peek() == '_')) {
 			ch = _in->get();
 			if (ch > 0) id += ch;
+			else break;
 		}
 		auto kwd = keywords.find(id);
 		if (kwd != keywords.end()) {
