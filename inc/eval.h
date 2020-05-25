@@ -315,8 +315,8 @@ namespace eval {
 		void exec(interpreter* intp) override {
 			auto& stack = intp->stack;
 			if (op <= op_type::div) { // math ops
-				auto b = dynamic_pointer_cast<int_value>(stack.top())->value; stack.pop();
-				auto a = dynamic_pointer_cast<int_value>(stack.top())->value; stack.pop();
+				auto b = std::dynamic_pointer_cast<int_value>(stack.top())->value; stack.pop();
+				auto a = std::dynamic_pointer_cast<int_value>(stack.top())->value; stack.pop();
 				auto value = 0;
 				switch (op) {
 				case op_type::add: value = a + b; break;
@@ -336,8 +336,8 @@ namespace eval {
 			}
 			else if (op <= op_type::greater_eq) { // compare ops
 			 // for now, we can only compare ints
-				auto b = dynamic_pointer_cast<int_value>(stack.top())->value; stack.pop();
-				auto a = dynamic_pointer_cast<int_value>(stack.top())->value; stack.pop();
+				auto b = std::dynamic_pointer_cast<int_value>(stack.top())->value; stack.pop();
+				auto a = std::dynamic_pointer_cast<int_value>(stack.top())->value; stack.pop();
 				auto value = false;
 				switch (op) {
 				case op_type::less: value = a < b; break;

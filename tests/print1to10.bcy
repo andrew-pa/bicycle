@@ -1,0 +1,12 @@
+
+
+fn print1to10() {
+    let i = 0;
+    loop {
+        if i > 10 { break; };
+        printv(i);
+        i = i + 2;
+    }
+}
+
+
