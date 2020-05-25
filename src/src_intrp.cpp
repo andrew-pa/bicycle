@@ -22,10 +22,12 @@
 // + system functions
 // + lists
 // + hashmaps
-// + multiple files
 // + dot operator
-// - tests/cmake
-// - macros
+// + multiple files
+// - modules
+// - tests
+// + cmake
+// / macros
 // - closures
 
 /*
@@ -62,9 +64,29 @@ macro mad:expr
 
 */
 
-std::tuple<bool, std::optional<std::string>> process_args(const std::vector<std::string>& args) {
+/*
+
+	mod thing2 {
+		// stmts
+	}
+
+	fn start() {
+		thing1::do_stuff();
+		thing2::do_stuff();
+	}
+
+	- mod global
+	|
+	-> mod thing1
+	|	-> do_stuff()
+	-> mod thing2
+	|	-> do_stuff()
+	-> start()
+*/
+
+std::tuple<bool, std::optional<std::filesystem::path>> process_args(const std::vector<std::string>& args) {
 	bool use_repl = false;
-	auto file = std::optional<std::string>();
+	auto file = std::optional<std::filesystem::path>();
 
 	if (args.size() == 0) {
 		std::cout << "pass a filename and/or -i to open the REPL" << std::endl;
@@ -78,31 +100,33 @@ std::tuple<bool, std::optional<std::string>> process_args(const std::vector<std:
 			std::cout << "unknown argument " << args[i] << std::endl;
 		}
 		else {
-			file = args[i];
+			file = std::filesystem::path(args[i]).lexically_normal();
 		}
 	}
 	
 	return std::tuple{ use_repl, file };
 }
 
-void load_file(tokenizer* tok, parser* par, std::shared_ptr<eval::scope> cx, std::string path) {
+void load_file(tokenizer* tok, parser* par, std::shared_ptr<eval::scope> cx, std::filesystem::path path) {
 	std::ifstream input_stream(path);
 	tok->reset(&input_stream);
 
-	ast::printer printer(std::cout, &tok->identifiers, 1);
+	ast::printer printer(std::cout, &tok->identifiers, 0);
 	while (!tok->peek().is_eof()) {
 		try {
 			auto stmt = par->next_stmt();
 			stmt->visit(&printer);
 			std::cout << std::endl;
-			eval::analyzer anl(&tok->identifiers);
+			eval::analyzer anl(&tok->identifiers, path.parent_path());
 			eval::interpreter intp(cx, anl.analyze(stmt));
+			//std::cout << std::endl;
+			//for (auto c : intp.code) c->print(std::cout);
 			intp.run();
 		}
 		catch (const parse_error& pe) {
 			std::cout << "parse error: " << pe.what()
 				<< " [file= " << path << "line= " << tok->line_number
-				<<" token type=" << pe.irritant.type << " data=" << pe.irritant.data << "]";
+				<< " token type=" << pe.irritant.type << " data=" << pe.irritant.data << "]";
 		}
 		catch (const std::runtime_error& e) {
 			std::cout << "error: " << e.what() << " in file " << path << std::endl;
@@ -156,7 +180,7 @@ int main(int argc, char* argv[]) {
 				auto expr = p.next_expr();
 				expr->visit(&printer);
 
-				eval::analyzer anl(&tk.identifiers);
+				eval::analyzer anl(&tk.identifiers, std::filesystem::current_path());
 				auto code = anl.analyze(std::make_shared<ast::return_stmt>(expr));
 				std::cout << std::endl;
 				for (auto c : code) c->print(std::cout);

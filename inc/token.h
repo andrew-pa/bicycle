@@ -7,7 +7,7 @@
 enum class symbol_type {
 	open_paren, close_paren,
 	open_brace, close_brace,
-	open_sq, close_sq, colon,
+	open_sq, close_sq, colon, double_colon,
 	semicolon, comma, dollar, thick_arrow
 };
 
@@ -18,7 +18,7 @@ enum class op_type {
 };
 
 enum class keyword_type {
-	fn, loop, break_, continue_, return_, if_, else_, let, true_, false_, macro
+	fn, loop, break_, continue_, return_, if_, else_, let, true_, false_, macro, mod
 };
 
 struct token {
@@ -86,6 +86,7 @@ const std::map<std::string, keyword_type> keywords = {
 	{ "true", keyword_type::true_ },
 	{ "false", keyword_type::false_ },
 	{ "macro", keyword_type::macro },
+	{ "mod", keyword_type::mod },
 };
 
 class tokenizer {

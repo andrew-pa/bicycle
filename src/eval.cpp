@@ -101,6 +101,12 @@ void eval::analyzer::visit(ast::named_value* x) {
 	instrs.push_back(std::make_shared<get_binding_instr>(ids->at(x->identifier)));
 }
 
+void eval::analyzer::visit(ast::qualified_value* x) {
+	std::vector<std::string> path;
+	for (auto i : x->path) path.push_back(ids->at(i));
+	instrs.push_back(std::make_shared<get_qualified_binding_instr>(path));
+}
+
 void eval::analyzer::visit(ast::integer_value* x) {
 	auto v = std::make_shared<int_value>(x->value);
 	instrs.push_back(std::make_shared<literal_instr>(v));
@@ -191,8 +197,55 @@ void eval::analyzer::visit(ast::fn_call* x) {
 void eval::analyzer::visit(ast::fn_value* x) {
 	std::vector<std::string> arg_names;
 	for (auto an : x->args) arg_names.push_back(ids->at(an));
-	eval::analyzer anl(ids);
+	eval::analyzer anl(ids, this->root_path);
 	auto fn = std::make_shared<fn_value>(arg_names, anl.analyze(x->body));
 	instrs.push_back(std::make_shared<literal_instr>(fn));
 }
+
+void eval::analyzer::visit(ast::module_stmt* s) {
+	instrs.push_back(std::make_shared<enter_scope_instr>());
+	if (s->body != nullptr) {
+		s->body->visit(this);
+	} else {
+		auto path = std::filesystem::path(root_path);
+		path /= ids->at(s->name) + ".bcy";
+		auto modcode = eval::load_and_assemble(path);
+		instrs.insert(instrs.end(),
+			std::make_move_iterator(modcode.begin()),
+			std::make_move_iterator(modcode.end()));
+	}
+	instrs.push_back(std::make_shared<exit_scope_as_new_module_instr>(ids->at(s->name)));
+}
+
+#include <fstream>
+#include "parse.h"
+
+std::vector<std::shared_ptr<eval::instr>> eval::load_and_assemble(const std::filesystem::path& path) {
+	std::ifstream input_stream(path);
+	tokenizer tok(&input_stream);
+	parser par(&tok);
+
+	std::vector<std::shared_ptr<eval::instr>> code;
+
+	while (!tok.peek().is_eof()) {
+		try {
+			auto stmt = par.next_stmt();
+			std::cout << std::endl;
+			eval::analyzer anl(&tok.identifiers, path.parent_path());
+			auto part = anl.analyze(stmt);
+			code.insert(code.end(), std::make_move_iterator(part.begin()), std::make_move_iterator(part.end()));
+		}
+		catch (const parse_error& pe) {
+			std::cout << "parse error: " << pe.what()
+				<< " [file= " << path << "line= " << tok.line_number
+				<< " token type=" << pe.irritant.type << " data=" << pe.irritant.data << "]";
+		}
+		catch (const std::runtime_error& e) {
+			std::cout << "error: " << e.what() << " in file " << path << std::endl;
+		}
+	}
+
+	return code;
+}
+
 

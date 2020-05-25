@@ -2,6 +2,7 @@
 
 #include <stack>
 #include <functional>
+#include <filesystem>
 #include "ast.h"
 
 namespace eval {
@@ -155,9 +156,10 @@ namespace eval {
 	struct scope {
 		std::shared_ptr<scope> parent;
 		std::map<std::string, std::shared_ptr<value>> bindings;
+		std::map<std::string, std::shared_ptr<scope>> modules;
 
-		scope(std::shared_ptr<scope> parent) : parent(parent), bindings() {}
-		scope(std::string name, std::shared_ptr<scope> parent) : parent(parent), bindings() {}
+		scope(std::shared_ptr<scope> parent) : parent(parent), bindings(), modules() {}
+		scope(std::string name, std::shared_ptr<scope> parent) : parent(parent), bindings(), modules() {}
 
 		std::shared_ptr<value> binding(const std::string& name) {
 			auto f = bindings.find(name);
@@ -166,6 +168,21 @@ namespace eval {
 				return parent->binding(name);
 			}
 			else throw std::runtime_error("unbound identifier " + name);
+		}
+
+		std::shared_ptr<value> qualified_binding(const std::vector<std::string>& path, int index = 0) {
+			if (index == path.size()-1) {
+				return binding(path[index]);
+			} else {
+				auto m = modules.find(path[index]);
+				if (m != modules.end()) {
+					return m->second->qualified_binding(path, index + 1);
+				}
+				else if(parent != nullptr) {
+					return parent->qualified_binding(path, index);
+				}
+				else throw std::runtime_error("unbound path");
+			}
 		}
 
 		void binding(const std::string& name, std::shared_ptr<value> v) {
@@ -180,7 +197,6 @@ namespace eval {
 		void bind(const std::string& name, std::shared_ptr<value> v) {
 			bindings[name] = v;
 		}
-
 	};
 
 	struct interpreter {
@@ -253,16 +269,32 @@ namespace eval {
 	struct get_binding_instr : public instr {
 		std::string name;
 		get_binding_instr(const std::string& name) : name(name) {}
-		void print(std::ostream& out) override { out << "get~" << name << std::endl; }
+		void print(std::ostream& out) override { out << "get(" << name << ")" << std::endl; }
 		void exec(interpreter* intp) override {
 			intp->stack.push(intp->current_scope->binding(name));
+		}
+	};
+
+	struct get_qualified_binding_instr : public instr {
+		std::vector<std::string> path;
+		get_qualified_binding_instr(const std::vector<std::string>& path) : path(path) {}
+		void print(std::ostream& out) override {
+			out << "get q(";
+			for (auto i = 0; i < path.size(); ++i) {
+				out << path[i];
+				if (i + 1 < path.size()) out << "::";
+			}
+			out << ")" << std::endl;
+		}
+		void exec(interpreter* intp) override {
+			intp->stack.push(intp->current_scope->qualified_binding(path));
 		}
 	};
 
 	struct set_binding_instr : public instr {
 		std::string name;
 		set_binding_instr(const std::string& name) : name(name) {}
-		void print(std::ostream& out) override { out << "set~" << name << std::endl; }
+		void print(std::ostream& out) override { out << "set(" << name << ")" << std::endl; }
 		void exec(interpreter* intp) override {
 			intp->current_scope->binding(name, intp->stack.top());
 			intp->stack.pop();
@@ -272,7 +304,7 @@ namespace eval {
 	struct bind_instr : public instr {
 		std::string name;
 		bind_instr(const std::string& name) : name(name) {}
-		void print(std::ostream& out) override { out << "bind~" << name << std::endl; }
+		void print(std::ostream& out) override { out << "bind(" << name << ")" << std::endl; }
 		void exec(interpreter* intp) override {
 			intp->current_scope->bind(name, intp->stack.top());
 			intp->stack.pop();
@@ -292,6 +324,20 @@ namespace eval {
 		}
 		void print(std::ostream& out) override { out << "] end scope" << std::endl; }
 	};
+
+	struct exit_scope_as_new_module_instr : public instr {
+		std::string name;
+
+		exit_scope_as_new_module_instr(std::string name) : name(name) {}
+
+		void exec(interpreter* intp) override {
+			auto parent = intp->current_scope->parent;
+			parent->modules[name] = intp->current_scope;
+			intp->current_scope = parent;
+		}
+		void print(std::ostream& out) override { out << "] new module(" << name << ")" << std::endl; }
+	};
+
 
 
 	struct if_instr : public instr {
@@ -485,6 +531,8 @@ namespace eval {
 
 	};
 
+	std::vector<std::shared_ptr<eval::instr>> load_and_assemble(const std::filesystem::path& path);
+
 	class analyzer : public ast::stmt_visitor, public ast::expr_visitor {
 
 		std::vector<std::string>* ids;
@@ -492,10 +540,12 @@ namespace eval {
 		size_t next_marker;
 		// (name, start - location, end - marker)
 		std::vector<std::tuple<std::optional<size_t>, size_t, size_t>> loop_marker_stack;
+		std::filesystem::path root_path;
 
 		inline size_t new_marker() { return ++next_marker;  }
 	public:
-		analyzer(std::vector<std::string>* ids) : ids(ids), instrs(), next_marker(1) {}
+		analyzer(std::vector<std::string>* ids, std::filesystem::path root_path)
+			: ids(ids), instrs(), next_marker(1), root_path(root_path) {}
 
 		std::vector<std::shared_ptr<instr>> analyze(std::shared_ptr<ast::statement> code) {
 			code->visit(this);
@@ -512,9 +562,11 @@ namespace eval {
 		virtual void visit(ast::break_stmt* s) override;
 		virtual void visit(ast::loop_stmt* s) override;
 		virtual void visit(ast::return_stmt* s) override;
+		virtual void visit(ast::module_stmt* s) override;
 
 		// Inherited via expr_visitor
 		virtual void visit(ast::named_value* x) override;
+		virtual void visit(ast::qualified_value* x) override;
 		virtual void visit(ast::integer_value* x) override;
 		virtual void visit(ast::str_value* x) override;
 		virtual void visit(ast::bool_value* x) override;

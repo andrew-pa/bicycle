@@ -18,11 +18,13 @@ namespace ast {
 		virtual void visit(struct break_stmt* s) = 0;
 		virtual void visit(struct loop_stmt* s) = 0;
 		virtual void visit(struct return_stmt* s) = 0;
+		virtual void visit(struct module_stmt* s) = 0;
 	};
 
 	class expr_visitor {
 	public:
 		virtual void visit(struct named_value* x) = 0;
+		virtual void visit(struct qualified_value* x) = 0;
 		virtual void visit(struct integer_value* x) = 0;
 		virtual void visit(struct str_value* x) = 0;
 		virtual void visit(struct bool_value* x) = 0;
@@ -53,6 +55,15 @@ namespace ast {
 
 		expr_visit_impl
 	};
+
+	struct qualified_value : expression {
+		std::vector<size_t> path;
+
+		qualified_value(std::vector<size_t> path) : path(path) {}
+
+		expr_visit_impl
+	};
+
 
 	struct integer_value : expression {
 		size_t value;
@@ -247,6 +258,15 @@ namespace ast {
 		stmt_visit_impl
 	};
 
+	struct module_stmt : statement {
+		size_t name;
+		std::shared_ptr<statement> body;
+
+		module_stmt(size_t name, std::shared_ptr<statement> body) : name(name), body(body) {}
+
+		stmt_visit_impl
+	};
+
 #undef stmt_visit_impl
 #undef expr_visit_impl
 
@@ -284,6 +304,8 @@ namespace ast {
 					out << "    ";
 			}
 		}
+
+		inline void set_indent_level(size_t l) { indent_level = l; }
 
 		// Inherited via stmt_visitor
 		virtual void visit(seq_stmt* s) override {
@@ -343,10 +365,28 @@ namespace ast {
 			out << "return ";
 			s->expr->visit(this);
 		}
+		virtual void visit(module_stmt* s) override {
+			out << "mod " << ids->at(s->name);
+			if (s->body != nullptr) {
+				out << " {";
+				indent_level++;
+				newline();
+				s->body->visit(this);
+				indent_level--;
+				newline();
+				out << "}";
+			}
+		}
 
 		// Inherited via expr_visitor
 		virtual void visit(named_value* x) override {
 			out << ids->at(x->identifier);
+		}
+		virtual void visit(qualified_value* x) override {
+			for (auto i = 0; i < x->path.size(); ++i) {
+				out << ids->at(x->path[i]);
+				if (i + 1 < x->path.size()) out << "::";
+			}
 		}
 		virtual void visit(integer_value* x) override {
 			out << x->value;

@@ -2,7 +2,9 @@ cmake_minimum_required(VERSION 3.16)
 
 project(bicycle VERSION 1.0 LANGUAGES CXX)
 
-add_library(bicycle_common src/eval.cpp src/parser.cpp src/tokenizer.cpp inc/ast.h inc/eval.h inc/parse.h inc/token.h)
+add_library(bicycle_common
+    src/eval.cpp src/parser.cpp src/tokenizer.cpp
+    inc/ast.h inc/eval.h inc/parse.h inc/token.h)
 target_include_directories(bicycle_common PUBLIC inc/)
 target_compile_features(bicycle_common PUBLIC cxx_std_17)
 

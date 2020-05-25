@@ -1,0 +1,13 @@
+
+mod print1to10;
+
+mod things {
+    fn square(x) {
+        return x * x;
+    }
+}
+
+printv(things::square(9));
+print1to10::print1to10();
+
+

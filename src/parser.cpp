@@ -72,6 +72,16 @@ std::shared_ptr<ast::expression> parser::next_basic_expr() {
 	}
 	else if (t.type == token::identifer) {
 		auto name = t.data;
+		if (tok->peek().is_symbol(symbol_type::double_colon)) {
+			std::vector<size_t> path{ name };
+			do {
+				tok->next();
+				t = tok->next();
+				if (!t.is_id()) error(t, "expected id in path");
+				path.push_back(t.data);
+			} while (tok->peek().is_symbol(symbol_type::double_colon));
+			return std::make_shared<ast::qualified_value>(path);
+		}
 		return std::make_shared<ast::named_value>(name);
 	}
 	else if (t.type == token::number) {
@@ -184,6 +194,23 @@ std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 			auto arg_names = this->parse_fn_args(t);
 			auto body = this->next_basic_stmt();
 			return std::make_shared<ast::let_stmt>(name, std::make_shared<ast::fn_value>(arg_names, body));
+		}
+		case keyword_type::mod: {
+			tok->next();
+			t = tok->next();
+			if (!t.is_id()) {
+				error(t, "expected name");
+			}
+			auto name = t.data;
+			std::shared_ptr<ast::statement> body = nullptr;
+			if (tok->peek().is_symbol(symbol_type::open_brace)) {
+				tok->next();
+				body = this->next_stmt();
+				t = tok->next();
+				if (!t.is_symbol(symbol_type::close_brace))
+					error(t, "expected closing brace for module");
+			}
+			return std::make_shared<ast::module_stmt>(name, body);
 		}
 		case keyword_type::true_:
 		case keyword_type::false_:
