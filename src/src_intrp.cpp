@@ -17,19 +17,6 @@
 #include "parse.h"
 #include "eval.h"
 
-// TODO:
-// + function definition
-// + system functions
-// + lists
-// + hashmaps
-// + dot operator
-// + multiple files
-// - modules
-// - tests
-// + cmake
-// / macros
-// - closures
-
 /*
 	<macro> := macro /name/ <macro-case>, + ;
 	<macro-case> := [ <pattern>* ] => { <code> }
@@ -119,8 +106,8 @@ void load_file(tokenizer* tok, parser* par, std::shared_ptr<eval::scope> cx, std
 			std::cout << std::endl;
 			eval::analyzer anl(&tok->identifiers, path.parent_path());
 			eval::interpreter intp(cx, anl.analyze(stmt));
-			//std::cout << std::endl;
-			//for (auto c : intp.code) c->print(std::cout);
+			std::cout << std::endl;
+			for (auto c : intp.code) c->print(std::cout);
 			intp.run();
 		}
 		catch (const parse_error& pe) {

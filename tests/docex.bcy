@@ -1,0 +1,57 @@
+
+let x = 7;
+
+if x > 5 {
+    print("x > 5")
+} else if x == 5 {
+    print("stuff");
+    print("x == 5")
+} else {
+    print("x < 5")
+}
+
+if x > 5 print("x > 5") else print("x <= 5");
+
+let i = 0;
+loop {
+    if i > 10 break;
+    i = i + 1;
+    if i == 3 continue;
+    printv(i);
+}
+
+let i = 0;
+loop outer {
+    i = i + 1;
+    print("-");
+    if i > 5 break outer;
+    let j = 0;
+    loop {
+        if j > 5 continue outer;
+        j = j + 1;
+        if j == 3 continue;
+        printv(j);
+    };
+} 
+
+fn square(x)
+    return x*x;
+
+fn gcd(a, b) {
+    loop {
+        if a > b {
+            a = a - b;
+        } else if a == b {
+            break;
+        } else {
+            b = b - a;
+        }
+    };
+    return b;
+}
+
+fn apply_twice(f, x) return f(f(x));
+
+printv(apply_twice(square, 9));
+printv(apply_twice(fn(x) return x + x / 2, 9));
+

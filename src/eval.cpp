@@ -49,8 +49,8 @@ void eval::analyzer::visit(ast::if_stmt* s) {
 void eval::analyzer::visit(ast::continue_stmt* s) {
 	auto start = 0;
 	if (s->name.has_value()) {
-		for (auto i = loop_marker_stack.size() - 1; i >= 0; --i) {
-			auto loop = loop_marker_stack[loop_marker_stack.size() - 1];
+		for (size_t i = loop_marker_stack.size() - 1; i >= 0; --i) {
+			auto loop = loop_marker_stack[i];
 			if (std::get<0>(loop).has_value() && std::get<0>(loop).value() == s->name.value()) {
 				start = std::get<1>(loop);
 				break;
@@ -207,9 +207,7 @@ void eval::analyzer::visit(ast::module_stmt* s) {
 	if (s->body != nullptr) {
 		s->body->visit(this);
 	} else {
-		auto path = std::filesystem::path(root_path);
-		path /= ids->at(s->name) + ".bcy";
-		auto modcode = eval::load_and_assemble(path);
+		auto modcode = eval::load_and_assemble(root_path / (ids->at(s->name)+".bcy"));
 		instrs.insert(instrs.end(),
 			std::make_move_iterator(modcode.begin()),
 			std::make_move_iterator(modcode.end()));
