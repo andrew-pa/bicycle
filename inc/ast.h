@@ -31,6 +31,7 @@ namespace ast {
 		virtual void visit(struct list_value* x) = 0;
 		virtual void visit(struct map_value* x) = 0;
 		virtual void visit(struct binary_op* x) = 0;
+		virtual void visit(struct logical_negation* x) = 0;
 		virtual void visit(struct fn_call* x) = 0;
 		virtual void visit(struct index_into* x) = 0;
 		virtual void visit(struct fn_value* x) = 0;
@@ -115,6 +116,14 @@ namespace ast {
 		expr_visit_impl
 	};
 
+	struct logical_negation : expression {
+		std::shared_ptr<expression> value;
+
+		logical_negation(std::shared_ptr<expression> v) : value(v) {}
+
+		expr_visit_impl
+	};
+
 	static const std::map<op_type, size_t> operator_precendence = {
 		{ op_type::add, 14 },
 		{ op_type::sub, 14 },
@@ -128,6 +137,9 @@ namespace ast {
 		{ op_type::greater, 12 },
 		{ op_type::less_eq, 12 },
 		{ op_type::greater_eq, 12 },
+
+		{ op_type::and_l, 6 },
+		{ op_type::or_l,  5 },
 
 		{ op_type::assign, 3 },
 		{ op_type::dot, 20 },
@@ -282,6 +294,9 @@ namespace ast {
 		case op_type::greater: out << ">"; break;
 		case op_type::less_eq: out << "<="; break;
 		case op_type::greater_eq: out << ">="; break;
+		case op_type::and_l: out << "&&"; break;
+		case op_type::or_l: out << "||"; break;
+		case op_type::not_l: out << "!"; break;
 		case op_type::assign: out << "="; break;
 		case op_type::dot: out << "."; break;
 		}
@@ -413,6 +428,11 @@ namespace ast {
 			print_op(x->op, out);
 			out << " ";
 			x->right->visit(this);
+			out << ")";
+		}
+		virtual void visit(logical_negation* x) override {
+			out << "!(";
+			x->value->visit(this);
 			out << ")";
 		}
 		virtual void visit(index_into* x) override {

@@ -112,13 +112,90 @@ void load_file(tokenizer* tok, parser* par, std::shared_ptr<eval::scope> cx, std
 		}
 		catch (const parse_error& pe) {
 			std::cout << "parse error: " << pe.what()
-				<< " [file= " << path << "line= " << tok->line_number
-				<< " token type=" << pe.irritant.type << " data=" << pe.irritant.data << "]";
+				<< " [file= " << path << " line= " << tok->line_number
+				<< " token type=" << pe.irritant.type << " data=" << pe.irritant.data;
+			if (pe.irritant.type == token::identifer) std::cout << " id=" << tok->identifiers.at(pe.irritant.data);
+			else if (pe.irritant.type == token::keyword) {
+				auto k = std::find_if(keywords.begin(), keywords.end(), [&](auto p) {
+					return p.second == (keyword_type)pe.irritant.data;
+				});
+				if (k != keywords.end()) std::cout << " kwd=" << k->first;
+				else std::cout << " kwd=unk";
+			}
+			std::cout << "]";
+			break;
 		}
 		catch (const std::runtime_error& e) {
 			std::cout << "error: " << e.what() << " in file " << path << std::endl;
 		}
 	}
+}
+
+std::shared_ptr<eval::value> mk_sys_fn(std::initializer_list<std::string>&& args, std::function<void(eval::interpreter* intrp)> f) {
+	return std::make_shared<eval::fn_value>(std::vector<std::string>(args),
+		std::vector<std::shared_ptr<eval::instr>> {
+		std::make_shared<eval::system_instr>(f)
+	});
+}
+
+struct ios_value : eval::value {
+	FILE* f;
+
+	ios_value(const std::string& path, const char* mode): f(nullptr) {
+		if (fopen_s(&f, path.c_str(), mode) != 0) {
+			throw std::runtime_error("error opening file " + path);
+		}
+	}
+
+	void print(std::ostream& out) override {
+		out << "<filestream@0x" << std::hex << (size_t)f << ">" << std::dec;
+	}
+
+	bool equal(std::shared_ptr<value> other) override {
+		return false;
+	}
+
+	~ios_value() {
+		if(f) fclose(f);
+	}
+};
+
+std::shared_ptr<eval::scope> build_file_api() {
+	auto mod = std::make_shared<eval::scope>(nullptr);
+	mod->bind("open", mk_sys_fn({"path"}, [](eval::interpreter* intrp) {
+		auto path = std::dynamic_pointer_cast<eval::str_value>(intrp->current_scope->binding("path"));
+		intrp->stack.push(std::make_shared<ios_value>(path->value, "r"));
+	}));
+	mod->bind("next_char", mk_sys_fn({"file"}, [](eval::interpreter* intrp) {
+		auto f = std::dynamic_pointer_cast<ios_value>(intrp->current_scope->binding("file"));
+		intrp->stack.push(std::make_shared<eval::int_value>(fgetc(f->f)));
+	}));
+	mod->bind("peek_char", mk_sys_fn({ "file" }, [](eval::interpreter* intrp) {
+		auto f = std::dynamic_pointer_cast<ios_value>(intrp->current_scope->binding("file"));
+		intrp->stack.push(std::make_shared<eval::int_value>(fgetc(f->f)));
+		fseek(f->f, -1, SEEK_CUR);
+	}));
+	mod->bind("eof", mk_sys_fn({"file"}, [](eval::interpreter* intrp) {
+		auto f = std::dynamic_pointer_cast<ios_value>(intrp->current_scope->binding("file"));
+		intrp->stack.push(std::make_shared<eval::bool_value>(feof(f->f) == 0));
+	}));
+	return mod;
+}
+
+std::shared_ptr<eval::scope> build_str_api() {
+	auto mod = std::make_shared<eval::scope>(nullptr);
+	mod->bind("concat", mk_sys_fn({ "a", "b" }, [](eval::interpreter* intrp) {
+		auto a = std::dynamic_pointer_cast<eval::str_value>(intrp->current_scope->binding("a"));
+		auto b = std::dynamic_pointer_cast<eval::str_value>(intrp->current_scope->binding("b"));
+		intrp->stack.push(std::make_shared<eval::str_value>(a->value + b->value));
+	}));
+	mod->bind("append", mk_sys_fn({ "str", "char" }, [](eval::interpreter* intrp) {
+		auto s = std::dynamic_pointer_cast<eval::str_value>(intrp->current_scope->binding("str"));
+		auto c = std::dynamic_pointer_cast<eval::int_value>(intrp->current_scope->binding("char"));
+		s->value.append(1, (char)c->value);
+		intrp->stack.push(s);
+	}));
+	return mod;
 }
 
 int main(int argc, char* argv[]) {
@@ -127,12 +204,12 @@ int main(int argc, char* argv[]) {
 	auto [use_repl, file] = process_args(args);
 
 	auto cx = std::make_shared<eval::scope>(nullptr);
+	cx->bind("nil", std::make_shared<eval::nil_value>());
 	cx->bind("print", std::make_shared<eval::fn_value>(std::vector<std::string>{ "str" },
 		std::vector<std::shared_ptr<eval::instr>> {
 			std::make_shared<eval::system_instr>(std::function([](eval::interpreter* intrp) {
 				auto v = std::dynamic_pointer_cast<eval::str_value>(intrp->current_scope->binding("str"));
 				std::cout << v->value << std::endl;
-				return nullptr;
 			}))
 		}));
 
@@ -142,9 +219,10 @@ int main(int argc, char* argv[]) {
 				auto v = intrp->current_scope->binding("val");
 				v->print(std::cout);
 				std::cout << std::endl;
-				return nullptr;
 			}))
 		}));
+	cx->modules["file"] = build_file_api();
+	cx->modules["str"] = build_str_api();
 
 	tokenizer tk(nullptr);
 	parser p(&tk);

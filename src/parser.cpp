@@ -102,6 +102,9 @@ std::shared_ptr<ast::expression> parser::next_basic_expr() {
 		auto body = this->next_basic_stmt();
 		return std::make_shared<ast::fn_value>(arg_names, body);
 	}
+	else if (t.is_op(op_type::not_l)) {
+		return std::make_shared<ast::logical_negation>(this->next_basic_expr());
+	}
 	else {
 		error(t, "expected start of expression");
 	}
@@ -113,6 +116,7 @@ std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 		tok->next();
 		t = tok->peek();
 		if (t.is_symbol(symbol_type::close_brace)) {
+			tok->next();
 			return std::make_shared<ast::block_stmt>(nullptr);
 		}
 		auto body = this->next_stmt();

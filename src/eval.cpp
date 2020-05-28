@@ -6,6 +6,7 @@ void eval::analyzer::visit(ast::seq_stmt* s) {
 }
 
 void eval::analyzer::visit(ast::block_stmt* s) {
+	if (s->body == nullptr) return;
 	instrs.push_back(std::make_shared<enter_scope_instr>());
 	s->body->visit(this);
 	instrs.push_back(std::make_shared<exit_scope_instr>());
@@ -176,6 +177,11 @@ void eval::analyzer::visit(ast::binary_op* x) {
 	x->left->visit(this);
 	x->right->visit(this);
 	instrs.push_back(std::make_shared<bin_op_instr>(x->op));
+}
+
+void eval::analyzer::visit(ast::logical_negation* x) {
+	x->value->visit(this);
+	instrs.push_back(std::make_shared<log_not_instr>());
 }
 
 void eval::analyzer::visit(ast::index_into* x) {

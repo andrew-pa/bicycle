@@ -11,10 +11,21 @@ namespace eval {
 		virtual bool equal(std::shared_ptr<value> other) = 0;
 	};
 
-	struct int_value : public value {
-		size_t value;
+	struct nil_value : public value {
+		void print(std::ostream& out) override {
+			out << "nil";
+		}
 
-		int_value(size_t v) : value(v) {}
+		bool equal(std::shared_ptr<eval::value> other) override {
+			return std::dynamic_pointer_cast<nil_value>(other) != nullptr;
+		}
+	
+	};
+
+	struct int_value : public value {
+		intptr_t value;
+
+		int_value(intptr_t v) : value(v) {}
 
 		void print(std::ostream& out) override {
 			out << value;
@@ -33,7 +44,7 @@ namespace eval {
 		str_value(std::string v) : value(v) {}
 
 		void print(std::ostream& out) override {
-			out << value;
+			out << "\"" << value << "\"";
 		}
 
 		bool equal(std::shared_ptr<eval::value> other) override {
@@ -399,6 +410,14 @@ namespace eval {
 		void print(std::ostream& out) override { out << "bin op "; ast::print_op(op, out); out << std::endl; }
 	};
 
+	struct log_not_instr : public instr {
+		void exec(interpreter* intrp) override {
+			auto a = std::dynamic_pointer_cast<bool_value>(intrp->stack.top()); intrp->stack.pop();
+			intrp->stack.push(std::make_shared<bool_value>(!a->value));
+		}
+		void print(std::ostream& out) override { out << "notl" << std::endl; }
+	};
+
 	struct jump_instr : public instr {
 		size_t loc;
 		jump_instr(size_t loc) : loc(loc) {}
@@ -514,9 +533,9 @@ namespace eval {
 	};
 
 	struct system_instr : public instr {
-		std::function<std::shared_ptr<value>(interpreter*)> f;
+		std::function<void(interpreter*)> f;
 
-		system_instr(std::function<std::shared_ptr<value>(interpreter*)> f)
+		system_instr(std::function<void(interpreter*)> f)
 			: f(f) {}
 
 
@@ -573,6 +592,7 @@ namespace eval {
 		virtual void visit(ast::list_value* x) override;
 		virtual void visit(ast::map_value* x) override;
 		virtual void visit(ast::binary_op* x) override;
+		virtual void visit(ast::logical_negation* x) override;
 		virtual void visit(ast::index_into* x) override;
 		virtual void visit(ast::fn_call* x) override;
 		virtual void visit(ast::fn_value* x) override;

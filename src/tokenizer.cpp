@@ -49,7 +49,16 @@ token tokenizer::next_in_stream() {
 		std::string str;
 		while (_in && _in->peek() != '"') {
 			ch = _in->get();
-			if (ch > 0) str += ch;
+			if (ch == '\\') {
+				auto nch = _in->get();
+				if (nch < 0) break;
+				else if (nch == '\\') ch = '\\';
+				else if (nch == 'n') ch = '\n';
+				else if (nch == 't') ch = '\t';
+				else if (nch == '"') ch = '"';
+				str += ch;
+			}
+			else if (ch > 0) str += ch;
 			else break;
 		}
 		_in->get();
@@ -57,7 +66,7 @@ token tokenizer::next_in_stream() {
 		string_literals.push_back(str);
 		return token(token::str, id);
 	}
-	else if (!isalnum(ch)) {
+	else if (!isalnum(ch) && ch != '_') {
 		std::string op;
 		op += ch;
 		while (_in && !isalnum(_in->peek()) && !isspace(_in->peek())) {

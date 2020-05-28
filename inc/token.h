@@ -14,6 +14,7 @@ enum class symbol_type {
 enum class op_type {
 	add, sub, mul, div,
 	eq, neq, less, greater, less_eq, greater_eq,
+	and_l, or_l, not_l,
 	assign, dot
 };
 
@@ -61,18 +62,21 @@ struct token {
 };
 
 const std::map<std::string, op_type> operators = {
-	  { "+", op_type::add },
-	  { "-", op_type::sub },
-	  { "*", op_type::mul },
-	  { "/", op_type::div },
-	  { "==", op_type::eq },
-	  { "!=", op_type::neq },
-	  { "<", op_type::less },
-	  { ">", op_type::greater },
-	  { "<=", op_type::less_eq },
-	  { ">=", op_type::greater_eq },
-	  { "=", op_type::assign },
-	  { ".", op_type::dot },
+	{ "+", op_type::add },
+	{ "-", op_type::sub },
+	{ "*", op_type::mul },
+	{ "/", op_type::div },
+	{ "==", op_type::eq },
+	{ "!=", op_type::neq },
+	{ "<", op_type::less },
+	{ ">", op_type::greater },
+	{ "<=", op_type::less_eq },
+	{ ">=", op_type::greater_eq },
+	{ "&&", op_type::and_l },
+	{ "||", op_type::or_l },
+	{ "!", op_type::not_l },
+	{ "=", op_type::assign },
+	{ ".", op_type::dot },
 };
 const std::map<std::string, keyword_type> keywords = {
 	{ "fn", keyword_type::fn },
