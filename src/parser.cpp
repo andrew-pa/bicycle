@@ -103,7 +103,7 @@ std::shared_ptr<ast::expression> parser::next_basic_expr() {
 		return std::make_shared<ast::fn_value>(arg_names, body);
 	}
 	else if (t.is_op(op_type::not_l)) {
-		return std::make_shared<ast::logical_negation>(this->next_basic_expr());
+		return std::make_shared<ast::logical_negation>(this->next_expr(true));
 	}
 	else {
 		error(t, "expected start of expression");
@@ -214,6 +214,10 @@ std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 				if (!t.is_symbol(symbol_type::close_brace))
 					error(t, "expected closing brace for module");
 			}
+			else if (tok->peek().is_op(op_type::mul)) {
+				tok->next();
+				return std::make_shared<ast::module_stmt>(name, nullptr, true);
+			}
 			return std::make_shared<ast::module_stmt>(name, body);
 		}
 		case keyword_type::true_:
@@ -227,12 +231,13 @@ std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 	}
 }
 
-std::shared_ptr<ast::expression> parser::next_expr() {
+std::shared_ptr<ast::expression> parser::next_expr(bool noop) {
 	auto x = this->next_basic_expr();
 
 	while (true) {
 		auto t = tok->peek();
 		if (t.type == token::op) {
+			if (noop) return x;
 			tok->next();
 			return std::make_shared<ast::binary_op>((op_type)t.data, x, this->next_expr());
 		}

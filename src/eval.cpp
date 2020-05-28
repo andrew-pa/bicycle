@@ -209,7 +209,7 @@ void eval::analyzer::visit(ast::fn_value* x) {
 }
 
 void eval::analyzer::visit(ast::module_stmt* s) {
-	instrs.push_back(std::make_shared<enter_scope_instr>());
+	if(!s->inner_import) instrs.push_back(std::make_shared<enter_scope_instr>());
 	if (s->body != nullptr) {
 		s->body->visit(this);
 	} else {
@@ -218,7 +218,7 @@ void eval::analyzer::visit(ast::module_stmt* s) {
 			std::make_move_iterator(modcode.begin()),
 			std::make_move_iterator(modcode.end()));
 	}
-	instrs.push_back(std::make_shared<exit_scope_as_new_module_instr>(ids->at(s->name)));
+	if(!s->inner_import) instrs.push_back(std::make_shared<exit_scope_as_new_module_instr>(ids->at(s->name)));
 }
 
 #include <fstream>

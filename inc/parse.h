@@ -70,7 +70,7 @@ public:
 			stmt_tok_id = std::distance(t->identifiers.begin(), st);
 	}
 
-	std::shared_ptr<ast::expression> next_expr();
+	std::shared_ptr<ast::expression> next_expr(bool noop = false);
 
 	std::shared_ptr<ast::statement> next_stmt();
 };

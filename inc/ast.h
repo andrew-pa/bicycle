@@ -273,8 +273,11 @@ namespace ast {
 	struct module_stmt : statement {
 		size_t name;
 		std::shared_ptr<statement> body;
+		bool inner_import;
 
-		module_stmt(size_t name, std::shared_ptr<statement> body) : name(name), body(body) {}
+		module_stmt(size_t name, std::shared_ptr<statement> body) : name(name), body(body), inner_import(false) {}
+		module_stmt(size_t name, std::shared_ptr<statement> body, bool ii)
+			: name(name), body(body), inner_import(ii) {}
 
 		stmt_visit_impl
 	};

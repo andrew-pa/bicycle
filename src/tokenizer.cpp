@@ -69,7 +69,7 @@ token tokenizer::next_in_stream() {
 	else if (!isalnum(ch) && ch != '_') {
 		std::string op;
 		op += ch;
-		while (_in && !isalnum(_in->peek()) && !isspace(_in->peek())) {
+		while (_in && !isalnum(_in->peek()) && !isspace(_in->peek()) && _in->peek() != ';') {
 			ch = _in->get();
 			if (ch > 0) op += ch;
 			else break;

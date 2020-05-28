@@ -1,0 +1,124 @@
+mod std*;
+
+mod token {
+    fn keyword(kwd) return { t: "kwd", kwd: kwd };
+    fn identifier(id) return { t: "id", id: id };
+    fn operator(op) return { t: "op", op: op };
+    fn symbol(sym) return { t: "sym", sym: sym };
+    fn string(s) return { t: "str", val: s };
+    fn number(num) return { t: "num", val: num };
+    fn eof() return { t: "eof" };
+}
+
+fn make_tokenizer(file) {
+    return {
+        file: file,
+        line_number: 0,
+        next_token: nil
+    };
+}
+
+let __keywords = [ "fn", "let", "loop", "break", "continue", "return", "if", "else", "true", "false", "mod" ];
+
+fn __next_token(tok) {
+    if file::eof(tok.file) return token::eof();
+    let ch = file::next_char(tok.file);
+
+    loop {
+        if ch == "\n" tok.line_number = tok.line_number + 1;
+        ch = file::next_char(tok.file);
+        if ch < 0 return token::eof();
+        if !char::is_whitespace(ch) break;
+    };
+
+    if ch == "{" || ch == "}" || ch == "(" || ch == ")"
+        || ch == "[" || ch == "]" || ch == ";" || ch == "," return token::symbol(ch);
+
+    if ch == ":" {
+        if file::peek_char(tok.file) == ":" {
+            file::next_char(tok.file);
+            return token::symbol("::");
+        };
+        return token::symbol(":");
+    } else if ch == "=" {
+        if file::peek_char(tok.file) == ">" {
+            file::next_char(tok.file);
+            return token::symbol("=>");
+        }
+    };
+
+    if char::is_digit(ch) {
+        let value = char::digit_value(ch);
+        loop {
+            if file::eof(tok.file) || !char::is_digit(file::peek_char(tok.file)) break;
+            value = value * 10 + char::digit_value(file::next_char(tok.file));
+        };
+        return token::number(value);
+    } else if ch == "\"" {
+        let value = "";
+        loop {
+            if file::eof(tok.file) || file::peek_char(tok.file) != "\"" break;
+            ch = file::next_char(tok.file);
+            if ch == "\\" {
+                let nch = file::next_char(tok.file);
+                if nch < 0 { break; }
+                else if nch == "\\" { ch = "\\"[0]; }
+                else if nch == "n" { ch = "\n"[0]; }
+                else if nch == "t" { ch = "\t"[0]; }
+                else if nch == "\"" { ch = "\""[0]; }
+            };
+            str::append(value, ch);
+        };
+        return token::string(value);
+    } else if !char::is_alphanumeric(ch) && ch != "_" {
+        let op = "";
+        str::append(op, ch);
+        loop {
+            let pch = file::peek_char(tok.file);
+            if file::eof(tok.file) || char::is_alphanumeric(pch) || char::is_whitespace(pch) break;
+            str::append(op, file::next_char(tok.file));
+        };
+        return token::operator(op);
+    } else {
+        let id = "";
+        str::append(id, ch);
+        loop {
+            let pch = file::peek_char(tok.file);
+            printv(pch);
+            if file::eof(tok.file) || !char::is_alphanumeric(pch) || pch != "_" break;
+            str::append(id, file::next_char(tok.file));
+        };
+        if list::contains(__keywords, id) {
+            return token::keyword(id);
+        } else {
+            return token::identifier(id);
+        }
+    }
+}
+
+fn next_token(tok) {
+    if tok.next_token != nil {
+        let nt = tok.next_token;
+        tok.next_token = nil;
+        return nt;
+    } else {
+        return __next_token(tok);
+    }
+}
+
+fn peek_token(tok) {
+    if tok.next_token == nil {
+        tok.next_token = __next_token(tok);
+    };
+    return tok.next_token;
+}
+
+fn _test(path) {
+    let tok = make_tokenizer(file::open(path));
+    printv(tok);
+    loop {
+        let t = next_token(tok);
+        if t.t == "eof" break;
+        printv(t);
+    }
+}

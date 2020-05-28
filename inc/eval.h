@@ -22,22 +22,6 @@ namespace eval {
 	
 	};
 
-	struct int_value : public value {
-		intptr_t value;
-
-		int_value(intptr_t v) : value(v) {}
-
-		void print(std::ostream& out) override {
-			out << value;
-		}
-
-		bool equal(std::shared_ptr<eval::value> other) override {
-			auto iv = std::dynamic_pointer_cast<int_value>(other);
-			if (iv != nullptr) return value == iv->value;
-			else return false;
-		}
-	};
-
 	struct str_value : public value {
 		std::string value;
 
@@ -50,6 +34,26 @@ namespace eval {
 		bool equal(std::shared_ptr<eval::value> other) override {
 			auto iv = std::dynamic_pointer_cast<str_value>(other);
 			if (iv != nullptr) return value == iv->value;
+			else return false;
+		}
+	};
+
+	struct int_value : public value {
+		intptr_t value;
+
+		int_value(intptr_t v) : value(v) {}
+
+		void print(std::ostream& out) override {
+			out << value;
+		}
+
+		bool equal(std::shared_ptr<eval::value> other) override {
+			auto iv = std::dynamic_pointer_cast<int_value>(other);
+			auto sv = std::dynamic_pointer_cast<str_value>(other);
+			if (iv != nullptr) return value == iv->value;
+			else if (sv != nullptr && sv->value.size() == 1) {
+				return value == sv->value[0];
+			}
 			else return false;
 		}
 	};
@@ -192,7 +196,11 @@ namespace eval {
 				else if(parent != nullptr) {
 					return parent->qualified_binding(path, index);
 				}
-				else throw std::runtime_error("unbound path");
+				else {
+					std::string s;
+					for (auto p : path) s += p + "|";
+					throw std::runtime_error("unbound path: " + s);
+				}
 			}
 		}
 
@@ -343,7 +351,14 @@ namespace eval {
 
 		void exec(interpreter* intp) override {
 			auto parent = intp->current_scope->parent;
-			parent->modules[name] = intp->current_scope;
+			auto exm = parent->modules.find(name);
+			if (exm != parent->modules.end()) {
+				exm->second->bindings.insert(intp->current_scope->bindings.begin(),
+					intp->current_scope->bindings.end());
+				exm->second->modules.insert(intp->current_scope->modules.begin(),
+					intp->current_scope->modules.end());
+			}
+			else parent->modules[name] = intp->current_scope;
 			intp->current_scope = parent;
 		}
 		void print(std::ostream& out) override { out << "] new module(" << name << ")" << std::endl; }
@@ -401,6 +416,17 @@ namespace eval {
 				case op_type::less_eq: value = a <= b; break;
 				case op_type::greater: value = a > b; break;
 				case op_type::greater_eq: value = a >= b; break;
+				default: throw std::runtime_error("unknown op");
+				}
+				stack.push(std::make_shared<bool_value>(value));
+			}
+			else if (op == op_type::and_l || op == op_type::or_l) {
+				auto b = std::dynamic_pointer_cast<bool_value>(stack.top())->value; stack.pop();
+				auto a = std::dynamic_pointer_cast<bool_value>(stack.top())->value; stack.pop();
+				auto value = false;
+				switch (op) {
+				case op_type::and_l: value = a && b; break;
+				case op_type::or_l:  value = a || b; break;
 				default: throw std::runtime_error("unknown op");
 				}
 				stack.push(std::make_shared<bool_value>(value));
@@ -472,6 +498,13 @@ namespace eval {
 				auto n = std::dynamic_pointer_cast<str_value>(ix);
 				if (n == nullptr) throw std::runtime_error("expected string key");
 				intp->stack.push(map->values[n->value]);
+				return;
+			}
+			auto str = std::dynamic_pointer_cast<str_value>(top);
+			if (str != nullptr) {
+				auto i = std::dynamic_pointer_cast<int_value>(ix);
+				if (i == nullptr) throw std::runtime_error("expected int index to string");
+				intp->stack.push(std::make_shared<int_value>(str->value[i->value]));
 				return;
 			}
 			throw std::runtime_error("attempted to index unindexable value");

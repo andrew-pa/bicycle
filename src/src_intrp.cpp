@@ -177,13 +177,17 @@ std::shared_ptr<eval::scope> build_file_api() {
 	}));
 	mod->bind("eof", mk_sys_fn({"file"}, [](eval::interpreter* intrp) {
 		auto f = std::dynamic_pointer_cast<ios_value>(intrp->current_scope->binding("file"));
-		intrp->stack.push(std::make_shared<eval::bool_value>(feof(f->f) == 0));
+		intrp->stack.push(std::make_shared<eval::bool_value>(feof(f->f) != 0));
 	}));
 	return mod;
 }
 
 std::shared_ptr<eval::scope> build_str_api() {
 	auto mod = std::make_shared<eval::scope>(nullptr);
+	mod->bind("length", mk_sys_fn({ "str" }, [](eval::interpreter* intrp) {
+		auto s = std::dynamic_pointer_cast<eval::str_value>(intrp->current_scope->binding("str"));
+		intrp->stack.push(std::make_shared<eval::int_value>(s->value.size()));
+	}));
 	mod->bind("concat", mk_sys_fn({ "a", "b" }, [](eval::interpreter* intrp) {
 		auto a = std::dynamic_pointer_cast<eval::str_value>(intrp->current_scope->binding("a"));
 		auto b = std::dynamic_pointer_cast<eval::str_value>(intrp->current_scope->binding("b"));
@@ -193,6 +197,29 @@ std::shared_ptr<eval::scope> build_str_api() {
 		auto s = std::dynamic_pointer_cast<eval::str_value>(intrp->current_scope->binding("str"));
 		auto c = std::dynamic_pointer_cast<eval::int_value>(intrp->current_scope->binding("char"));
 		s->value.append(1, (char)c->value);
+		intrp->stack.push(s);
+	}));
+	return mod;
+}
+
+std::shared_ptr<eval::scope> build_list_api() {
+	auto mod = std::make_shared<eval::scope>(nullptr);
+	mod->bind("length", mk_sys_fn({ "lst" }, [](eval::interpreter* intrp) {
+		auto lst = std::dynamic_pointer_cast<eval::list_value>(intrp->current_scope->binding("lst"));
+		intrp->stack.push(std::make_shared<eval::int_value>(lst->values.size()));
+	}));
+	mod->bind("concat", mk_sys_fn({ "a", "b" }, [](eval::interpreter* intrp) {
+		auto a = std::dynamic_pointer_cast<eval::list_value>(intrp->current_scope->binding("a"));
+		auto b = std::dynamic_pointer_cast<eval::list_value>(intrp->current_scope->binding("b"));
+		std::vector<std::shared_ptr<eval::value>> vals;
+		vals.insert(vals.end(), a->values.begin(), a->values.end());
+		vals.insert(vals.end(), b->values.begin(), b->values.end());
+		intrp->stack.push(std::make_shared<eval::list_value>(vals));
+	}));
+	mod->bind("append", mk_sys_fn({ "lst", "x" }, [](eval::interpreter* intrp) {
+		auto s = std::dynamic_pointer_cast<eval::list_value>(intrp->current_scope->binding("lst"));
+		auto c = intrp->current_scope->binding("x");
+		s->values.push_back(c);
 		intrp->stack.push(s);
 	}));
 	return mod;
@@ -223,6 +250,7 @@ int main(int argc, char* argv[]) {
 		}));
 	cx->modules["file"] = build_file_api();
 	cx->modules["str"] = build_str_api();
+	cx->modules["list"] = build_list_api();
 
 	tokenizer tk(nullptr);
 	parser p(&tk);
