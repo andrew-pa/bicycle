@@ -67,9 +67,9 @@ namespace ast {
 
 
 	struct integer_value : expression {
-		size_t value;
+		intptr_t value;
 
-		integer_value(size_t v) : value(v) {}
+		integer_value(intptr_t v) : value(v) {}
 
 		expr_visit_impl
 	};

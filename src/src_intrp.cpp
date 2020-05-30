@@ -155,6 +155,10 @@ struct ios_value : eval::value {
 		return false;
 	}
 
+	eval::value* clone() override {
+		throw std::runtime_error("cannot clone file handle");
+	}
+
 	~ios_value() {
 		if(f) fclose(f);
 	}

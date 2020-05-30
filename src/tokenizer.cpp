@@ -38,12 +38,17 @@ token tokenizer::next_in_stream() {
 	}
 	}
 
-	if (isdigit(ch)) {
-		size_t value = ch - '0';
+	if (isdigit(ch) || (ch == '-' && isdigit(_in->peek()))) {
+		int sign = 1;
+		if (ch == '-') {
+			ch = _in->get();
+			sign = -1;
+		}
+		intptr_t value = ch - '0';
 		while (_in && isdigit(_in->peek())) {
 			value = value * 10 + (_in->get() - '0');
 		}
-		return token(token::number, value);
+		return token(token::number, value*sign);
 	}
 	else if (ch == '"') {
 		std::string str;

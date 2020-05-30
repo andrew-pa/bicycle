@@ -9,6 +9,7 @@ namespace eval {
 	struct value {
 		virtual void print(std::ostream& out) = 0;
 		virtual bool equal(std::shared_ptr<value> other) = 0;
+		virtual value* clone() = 0;
 	};
 
 	struct nil_value : public value {
@@ -19,7 +20,8 @@ namespace eval {
 		bool equal(std::shared_ptr<eval::value> other) override {
 			return std::dynamic_pointer_cast<nil_value>(other) != nullptr;
 		}
-	
+		
+		value* clone() override { return new nil_value;  }
 	};
 
 	struct str_value : public value {
@@ -36,6 +38,8 @@ namespace eval {
 			if (iv != nullptr) return value == iv->value;
 			else return false;
 		}
+
+		eval::value* clone() override { return new str_value(value);  }
 	};
 
 	struct int_value : public value {
@@ -56,6 +60,8 @@ namespace eval {
 			}
 			else return false;
 		}
+
+		eval::value* clone() override { return new int_value(value); }
 	};
 
 	struct bool_value : public value {
@@ -72,6 +78,8 @@ namespace eval {
 			if (iv != nullptr) return value == iv->value;
 			else return false;
 		}
+
+		eval::value* clone() override { return new bool_value(value); }
 	};
 
 	struct list_value : public value {
@@ -98,6 +106,14 @@ namespace eval {
 				return true;
 			}
 			else return false;
+		}
+
+		eval::value* clone() override {
+			std::vector<std::shared_ptr<value>> nv;
+			for (auto v : values) {
+				nv.push_back(std::shared_ptr<value>(v->clone()));
+			}
+			return new list_value(nv);
 		}
 	};
 
@@ -126,6 +142,14 @@ namespace eval {
 				return &*mv == this;
 			}
 			return false;
+		}
+
+		eval::value* clone() override {
+			std::map<std::string, std::shared_ptr<value>> nv;
+			for (auto v : values) {
+				nv[v.first] = std::shared_ptr<value>(v.second->clone());
+			}
+			return new map_value(nv);
 		}
 	};
 
@@ -165,6 +189,11 @@ namespace eval {
 
 		bool equal(std::shared_ptr<eval::value> other) override {
 			return false;
+		}
+
+
+		eval::value* clone() override {
+			return new fn_value(arg_names, body);
 		}
 	};
 
@@ -281,7 +310,7 @@ namespace eval {
 		literal_instr(std::shared_ptr<value> v) : val(v) {}
 		void print(std::ostream& out) override { out << "literal "; val->print(out); out << std::endl; }
 		void exec(interpreter* intp) override {
-			intp->stack.push(val);
+			intp->stack.push(std::shared_ptr<value>(val->clone()));
 		}
 	};
 

@@ -26,9 +26,9 @@ fn __next_token(tok) {
 
     loop {
         if ch == "\n" tok.line_number = tok.line_number + 1;
-        ch = file::next_char(tok.file);
         if ch < 0 return token::eof();
         if !char::is_whitespace(ch) break;
+        ch = file::next_char(tok.file);
     };
 
     if ch == "{" || ch == "}" || ch == "(" || ch == ")"
@@ -47,19 +47,25 @@ fn __next_token(tok) {
         }
     };
 
-    if char::is_digit(ch) {
+    if char::is_digit(ch) || (ch == "-" && char::is_digit(file::peek_char(tok.file))) {
+        let sign = 1;
+        if ch == "-" {
+            ch = file::next_char(tok.file);
+            sign = -1;
+        };
         let value = char::digit_value(ch);
         loop {
             if file::eof(tok.file) || !char::is_digit(file::peek_char(tok.file)) break;
             value = value * 10 + char::digit_value(file::next_char(tok.file));
         };
-        return token::number(value);
+        return token::number(value * sign);
     } else if ch == "\"" {
         let value = "";
         loop {
-            if file::eof(tok.file) || file::peek_char(tok.file) != "\"" break;
+            if file::eof(tok.file) break;
             ch = file::next_char(tok.file);
-            if ch == "\\" {
+            if ch == "\"" break
+            else if ch == "\\" {
                 let nch = file::next_char(tok.file);
                 if nch < 0 { break; }
                 else if nch == "\\" { ch = "\\"[0]; }
@@ -75,7 +81,7 @@ fn __next_token(tok) {
         str::append(op, ch);
         loop {
             let pch = file::peek_char(tok.file);
-            if file::eof(tok.file) || char::is_alphanumeric(pch) || char::is_whitespace(pch) break;
+            if file::eof(tok.file) || char::is_alphanumeric(pch) || char::is_whitespace(pch) || pch == ";" break;
             str::append(op, file::next_char(tok.file));
         };
         return token::operator(op);
@@ -84,8 +90,7 @@ fn __next_token(tok) {
         str::append(id, ch);
         loop {
             let pch = file::peek_char(tok.file);
-            printv(pch);
-            if file::eof(tok.file) || !char::is_alphanumeric(pch) || pch != "_" break;
+            if file::eof(tok.file) || !char::is_alphanumeric(pch) && pch != "_" break;
             str::append(id, file::next_char(tok.file));
         };
         if list::contains(__keywords, id) {
