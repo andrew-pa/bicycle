@@ -135,7 +135,7 @@ std::shared_ptr<eval::value> mk_sys_fn(std::initializer_list<std::string>&& args
 	return std::make_shared<eval::fn_value>(std::vector<std::string>(args),
 		std::vector<std::shared_ptr<eval::instr>> {
 		std::make_shared<eval::system_instr>(f)
-	});
+	}, nullptr);
 }
 
 struct ios_value : eval::value {
@@ -178,6 +178,10 @@ std::shared_ptr<eval::scope> build_file_api() {
 		auto f = std::dynamic_pointer_cast<ios_value>(intrp->current_scope->binding("file"));
 		intrp->stack.push(std::make_shared<eval::int_value>(fgetc(f->f)));
 		fseek(f->f, -1, SEEK_CUR);
+	}));
+	mod->bind("current_position", mk_sys_fn({"file"}, [](eval::interpreter* intrp) {
+		auto f = std::dynamic_pointer_cast<ios_value>(intrp->current_scope->binding("file"));
+		intrp->stack.push(std::make_shared<eval::int_value>(ftell(f->f)));
 	}));
 	mod->bind("eof", mk_sys_fn({"file"}, [](eval::interpreter* intrp) {
 		auto f = std::dynamic_pointer_cast<ios_value>(intrp->current_scope->binding("file"));
@@ -240,18 +244,29 @@ int main(int argc, char* argv[]) {
 		std::vector<std::shared_ptr<eval::instr>> {
 			std::make_shared<eval::system_instr>(std::function([](eval::interpreter* intrp) {
 				auto v = std::dynamic_pointer_cast<eval::str_value>(intrp->current_scope->binding("str"));
+				std::cout << v->value;
+			}))
+		}, nullptr));
+	
+	cx->bind("println", std::make_shared<eval::fn_value>(std::vector<std::string>{ "str" },
+		std::vector<std::shared_ptr<eval::instr>> {
+			std::make_shared<eval::system_instr>(std::function([](eval::interpreter* intrp) {
+				auto v = std::dynamic_pointer_cast<eval::str_value>(intrp->current_scope->binding("str"));
 				std::cout << v->value << std::endl;
 			}))
-		}));
+		}, nullptr));
+
 
 	cx->bind("printv", std::make_shared<eval::fn_value>(std::vector<std::string>{ "val" },
 		std::vector<std::shared_ptr<eval::instr>> {
 			std::make_shared<eval::system_instr>(std::function([](eval::interpreter* intrp) {
 				auto v = intrp->current_scope->binding("val");
 				v->print(std::cout);
-				std::cout << std::endl;
 			}))
-		}));
+		}, nullptr));
+	cx->bind("error", mk_sys_fn({ "msg" }, [](eval::interpreter* intrp) {
+		throw std::runtime_error(std::dynamic_pointer_cast<eval::str_value>(intrp->stack.top())->value);
+	}));
 	cx->modules["file"] = build_file_api();
 	cx->modules["str"] = build_str_api();
 	cx->modules["list"] = build_list_api();

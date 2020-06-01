@@ -33,16 +33,20 @@ std::shared_ptr<ast::expression> parser::next_basic_expr() {
 		}
 		else if (t.data == (size_t)symbol_type::open_sq) {
 			std::vector<std::shared_ptr<ast::expression>> values;
-			while (true) {
-				values.push_back(this->next_expr());
-				t = tok->next();
-				if (t.type == token::symbol) {
-					if (t.data == (size_t)symbol_type::close_sq) { break; }
-					else if (t.data == (size_t)symbol_type::comma) { continue; }
+			t = tok->peek();
+			if (!t.is_symbol(symbol_type::close_sq)) {
+				while (true) {
+					values.push_back(this->next_expr());
+					t = tok->next();
+					if (t.type == token::symbol) {
+						if (t.data == (size_t)symbol_type::close_sq) { break; }
+						else if (t.data == (size_t)symbol_type::comma) { continue; }
+					}
+					error(t, "unexpected token in list");
+					break;
 				}
-				error(t, "unexpected token in list");
-				break;
 			}
+			else tok->next();
 			return std::make_shared<ast::list_value>(values);
 		}
 		else if (t.data == (size_t)symbol_type::open_brace) {

@@ -168,35 +168,6 @@ namespace eval {
 	};
 
 
-	struct fn_value : public value {
-		std::vector<std::string> arg_names;
-		std::vector<std::shared_ptr<instr>> body;
-
-		fn_value(std::vector<std::string> an, std::vector<std::shared_ptr<instr>> body) : arg_names(an), body(body) {}
-
-		void print(std::ostream& out) override {
-			out << "fn(";
-			for (auto i = 0; i < arg_names.size(); ++i) {
-				out << arg_names[i];
-				if (i + 1 < arg_names.size()) out << ", ";
-			}
-			out << ")" << std::endl;
-			for (auto i : body) {
-				out << "\t";
-				i->print(out);
-			}
-		}
-
-		bool equal(std::shared_ptr<eval::value> other) override {
-			return false;
-		}
-
-
-		eval::value* clone() override {
-			return new fn_value(arg_names, body);
-		}
-	};
-
 	struct scope {
 		std::shared_ptr<scope> parent;
 		std::map<std::string, std::shared_ptr<value>> bindings;
@@ -244,6 +215,40 @@ namespace eval {
 
 		void bind(const std::string& name, std::shared_ptr<value> v) {
 			bindings[name] = v;
+		}
+	};
+
+	struct fn_value : public value {
+		std::vector<std::string> arg_names;
+		std::vector<std::shared_ptr<instr>> body;
+		std::shared_ptr<scope> closure;
+
+		fn_value(std::vector<std::string> an, std::vector<std::shared_ptr<instr>> body, std::shared_ptr<scope> c) : arg_names(an), body(body), closure(c) {}
+
+		void print(std::ostream& out) override {
+			out << "fn(";
+			for (auto i = 0; i < arg_names.size(); ++i) {
+				out << arg_names[i];
+				if (i + 1 < arg_names.size()) out << ", ";
+			}
+			out << ")";
+			if (closure != nullptr) {
+				out << "&";
+			}
+			out << std::endl;
+			for (auto i : body) {
+				out << "\t";
+				i->print(out);
+			}
+		}
+
+		bool equal(std::shared_ptr<eval::value> other) override {
+			return false;
+		}
+
+
+		eval::value* clone() override {
+			return new fn_value(arg_names, body, closure);
 		}
 	};
 
@@ -490,11 +495,36 @@ namespace eval {
 		void print(std::ostream& out) override { out << "jmp mark " << id << std::endl; }
 	};
 
+	struct make_closure_instr : public instr {
+		std::vector<std::string> arg_names;
+		std::vector<std::shared_ptr<instr>> body;
+		make_closure_instr(const std::vector<std::string>& arg_names, const std::vector<std::shared_ptr<instr>>& body)
+			: arg_names(arg_names), body(body) {}
+
+		void print(std::ostream& out) override {
+			out << "closure fn(";
+			for (auto i = 0; i < arg_names.size(); ++i) {
+				out << arg_names[i];
+				if (i + 1 < arg_names.size()) out << ", ";
+			}
+			out << ")" << std::endl;
+			for (auto i : body) {
+				out << "\t";
+				i->print(out);
+			}
+			out << std::endl;
+		}
+		void exec(interpreter* intp) override {
+			intp->stack.push(std::make_shared<fn_value>(arg_names, body, intp->current_scope));
+		}
+	};
+
 	struct call_instr : public instr {
 		void exec(interpreter* intp) override {
 			auto fn = std::dynamic_pointer_cast<fn_value>(intp->stack.top()); intp->stack.pop();
-			auto fncx = std::make_shared<scope>(intp->global_scope);
+			auto fncx = std::make_shared<scope>(fn->closure == nullptr ? intp->global_scope : fn->closure);
 			for (auto an : fn->arg_names) {
+				if (intp->stack.empty()) throw std::runtime_error("expected more arguments for fn call");
 				fncx->bind(an, intp->stack.top()); intp->stack.pop();
 			}
 			interpreter fn_intp(fncx, fn->body);

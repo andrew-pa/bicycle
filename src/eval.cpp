@@ -204,8 +204,7 @@ void eval::analyzer::visit(ast::fn_value* x) {
 	std::vector<std::string> arg_names;
 	for (auto an : x->args) arg_names.push_back(ids->at(an));
 	eval::analyzer anl(ids, this->root_path);
-	auto fn = std::make_shared<fn_value>(arg_names, anl.analyze(x->body));
-	instrs.push_back(std::make_shared<literal_instr>(fn));
+	instrs.push_back(std::make_shared<make_closure_instr>(arg_names, anl.analyze(x->body)));
 }
 
 void eval::analyzer::visit(ast::module_stmt* s) {
