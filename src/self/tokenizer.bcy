@@ -1,49 +1,60 @@
 mod std*;
 
-mod token {
-    fn keyword(kwd) return { t: "kwd", kwd: kwd };
-    fn identifier(id) return { t: "id", id: id };
-    fn operator(op) return { t: "op", op: op };
-    fn symbol(sym) return { t: "sym", sym: sym };
-    fn string(s) return { t: "str", val: s };
-    fn number(num) return { t: "num", val: num };
-    fn eof() return { t: "eof" };
-}
-
 fn make_tokenizer(file) {
     return {
         file: file,
         line_number: 0,
+        start_of_line: 0,
         next_token: nil
     };
+}
+
+fn gen_info(tok) {
+    return {
+        line: tok.line_number,
+        col: file::current_position(tok.file) - tok.start_of_line
+    };
+}
+
+mod token {
+    fn keyword(tok, kwd) return { t: "kwd", kwd: kwd, info: gen_info(tok) };
+    fn identifier(tok, id) return { t: "id", id: id, info: gen_info(tok) };
+    fn operator(tok, op) return { t: "op", op: op, info: gen_info(tok) };
+    fn symbol(tok, sym) return { t: "sym", sym: sym, info: gen_info(tok) };
+    fn string(tok, s) return { t: "str", val: s, info: gen_info(tok) };
+    fn number(tok, num) return { t: "num", val: num, info: gen_info(tok) };
+    fn eof(tok) return { t: "eof", info: gen_info(tok) };
 }
 
 let __keywords = [ "fn", "let", "loop", "break", "continue", "return", "if", "else", "true", "false", "mod" ];
 
 fn __next_token(tok) {
-    if file::eof(tok.file) return token::eof();
+    if file::eof(tok.file) return token::eof(tok);
     let ch = file::next_char(tok.file);
 
     loop {
-        if ch == "\n" tok.line_number = tok.line_number + 1;
-        if ch < 0 return token::eof();
+        if ch == "\n" {
+            tok.line_number = tok.line_number + 1;
+            tok.start_of_line = file::current_position(tok.file);
+        };
+        if ch < 0 return token::eof(tok);
         if !char::is_whitespace(ch) break;
         ch = file::next_char(tok.file);
     };
 
     if ch == "{" || ch == "}" || ch == "(" || ch == ")"
-        || ch == "[" || ch == "]" || ch == ";" || ch == "," return token::symbol(ch);
+        || ch == "[" || ch == "]" || ch == ";" || ch == "," return token::symbol(tok, ch);
 
     if ch == ":" {
         if file::peek_char(tok.file) == ":" {
             file::next_char(tok.file);
-            return token::symbol("::");
+            return token::symbol(tok, "::");
         };
         return token::symbol(":");
     } else if ch == "=" {
         if file::peek_char(tok.file) == ">" {
             file::next_char(tok.file);
-            return token::symbol("=>");
+            return token::symbol(tok, "=>");
         }
     };
 
@@ -58,7 +69,7 @@ fn __next_token(tok) {
             if file::eof(tok.file) || !char::is_digit(file::peek_char(tok.file)) break;
             value = value * 10 + char::digit_value(file::next_char(tok.file));
         };
-        return token::number(value * sign);
+        return token::number(tok, value * sign);
     } else if ch == "\"" {
         let value = "";
         loop {
@@ -75,7 +86,7 @@ fn __next_token(tok) {
             };
             str::append(value, ch);
         };
-        return token::string(value);
+        return token::string(tok, value);
     } else if !char::is_alphanumeric(ch) && ch != "_" {
         let op = "";
         str::append(op, ch);
@@ -84,7 +95,7 @@ fn __next_token(tok) {
             if file::eof(tok.file) || char::is_alphanumeric(pch) || char::is_whitespace(pch) || pch == ";" break;
             str::append(op, file::next_char(tok.file));
         };
-        return token::operator(op);
+        return token::operator(tok, op);
     } else {
         let id = "";
         str::append(id, ch);
@@ -94,14 +105,14 @@ fn __next_token(tok) {
             str::append(id, file::next_char(tok.file));
         };
         if list::contains(__keywords, id) {
-            return token::keyword(id);
+            return token::keyword(tok, id);
         } else {
-            return token::identifier(id);
+            return token::identifier(tok, id);
         }
     }
 }
 
-fn next_token(tok) {
+fn next(tok) {
     if tok.next_token != nil {
         let nt = tok.next_token;
         tok.next_token = nil;
@@ -111,7 +122,7 @@ fn next_token(tok) {
     }
 }
 
-fn peek_token(tok) {
+fn peek(tok) {
     if tok.next_token == nil {
         tok.next_token = __next_token(tok);
     };
@@ -122,7 +133,7 @@ fn _test(path) {
     let tok = make_tokenizer(file::open(path));
     printv(tok);
     loop {
-        let t = next_token(tok);
+        let t = next(tok);
         if t.t == "eof" break;
         printv(t);
     }
