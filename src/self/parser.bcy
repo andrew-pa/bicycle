@@ -2,23 +2,242 @@ mod tokenizer;
 
 fn parse_error(tk, msg) {
     print("token info = ");
-    printv(tk.info);
+    printv(tk);
     println(";");
     error(msg);
 }
 
-fn __next_basic_expr(tok) {}
+fn __parse_arg_names(tok) {
+    let names = [];
+    let t = tokenizer::next(tok);
+    if t.t != "sym" || t.sym != "(" {
+        parse_error(t, "expected open paren for function");
+    };
+    loop {
+        t = tokenizer::next(tok);
+        if t.t == "id" {
+            list::append(names, t.id);
+            t = tokenizer::next(tok);
+        };
+        if t.t == "sym" {
+            if t.sym == "," continue
+            else if t.sym == ")" break;
+        };
+        parse_error(t, "expected either a comma or closing paren in fn def");
+        break;
+    };
+    return names;
+}
 
-fn __next_basic_stmt(tok) {}
+fn __next_basic_expr(tok) {
+    let t = tokenizer::next(tok);
+    if t.t == "sym" {
+        if t.sym == "(" {
+            let inside = next_expr(tok, false);
+            t = tokenizer::next(tok);
+            if t.t != "sym" || t.sym != ")" {
+                parse_error(t, "expected closing paren");
+            };
+            return inside;
+        } else if t.sym == "[" {
+            let values = [];
+            t = tokenizer::peek(tok);
+            if t.t != "sym" || t.sym != "]" {
+                loop {
+                    list::append(values, next_expr(tok, false));
+                    t = tokenizer::next(tok);
+                    if t.t = "sym" {
+                        if t.sym == "]" break
+                        else if t.sym == "," continue;
+                    };
+                    parse_error(t, "unexpected token in list");
+                    break;
+                }
+            } else tokenizer::next(tok);
+            return { t: "list", values: values };
+        } else if t.sym == "{" {
+            let values = {};
+            if t.t != "sym" || t.sym != "}" {
+                loop {
+                    t = tokenizer::next(tok);
+                    if t.t != "id" {
+                        parse_error(t, "unexpected token in map, expected key");
+                        break;
+                    };
+                    let key = t.id;
+                    t = tokenizer::next(tok);
+                    if t.t != "sym" || t.sym != ":" {
+                        parse_error(t, "expected colon after key in map");
+                    };
+                    values[key] = next_expr(tok, false);
+                    t = tokenizer::next(tok);
+                    if t.t = "sym" {
+                        if t.sym == "}" break
+                        else if t.sym == "," continue;
+                    };
+                    parse_error(t, "unexpected token in map");
+                    break;
+                }
+            } else tokenizer::next(tok);
+            return { t: "map", values: values };
+        } else {
+            parse_error(t, "unexpected symbol in expression");
+        }
+    } else if t.t == "id" {
+        let name = t.id;
+        let nt = tokenizer::peek(tok);
+        if nt.t == "sym" && t.sym == "::" {
+            let path = [ name ];
+            loop {
+                tokenizer::next(tok);
+                t = tokenizer::next(tok);
+                if t.t != "id" parse_error(t, "expected id in path");
+                list::append(path, t.id);
+                nt = tokenizer::peek(tok);
+                if nt.t != "sym" || nt.sym != "::" break;
+            };
+            return { t: "qfv", path: path };
+        };
+        return { t: "id", name: name };
+    } else if t.t == "num" {
+        return { t: "num", val: t.val };
+    } else if t.t == "str" {
+        return { t: "str", val: t.val };
+    } else if t.t == "kwd" {
+        if t.kwd == "true" {
+            return { t: "bool", val: true };
+        } else if t.kwd = "false" {
+            return { t: "bool", val: false };
+        } else if t.kwd = "fn" {
+            let arg_names = __parse_arg_names(tok);
+            let body = __next_basic_stmt(tok);
+            return { t: "fn", arg_names: arg_names, body: body };
+        } else {
+            parse_error(t, "unexpected keyword in start of expression");
+        }
+    } else if t.t == "op" && t.op == "!" {
+        return { t: "lnot", val: next_expr(tok, true) };
+    } else {
+        parse_error(t, "expected start of expression");
+    }
+}
+
+fn __next_basic_stmt(tok) {
+    let t = tokenizer::peek(tok);
+    if t.t == "sym" && t.sym == "{" {
+        tokenizer::next(tok);
+        t = tokenizer::peek(tok);
+        if t.t == "sym" && t.sym == "}" {
+            tokenizer::next(tok);
+            return { t: "block", body: nil };
+        };
+        let body = next_stmt(tok);
+        t = tokenizer::next(tok);
+        if t.t != "sym" || t.sym != "}" parse_error(t, "expected closing brace");
+        return { t: "block", body: body };
+    } else if t.t == "kwd" {
+        if t.kwd == "if" {
+            tokenizer::next(tok);
+            let cond = next_expr(tok, false);
+            let ift = __next_basic_stmt(tok);
+            let iff = nil;
+            t = tokenizer::peek(tok);
+            if t.t == "kwd" && t.kwd == "else" {
+                tokenizer::next(tok);
+                iff = __next_basic_stmt(tok);
+            };
+            return { t: "if", cond: cond, then_stmt: ift, else_stmt: iff };
+        } else if t.kwd == "loop" {
+            tokenizer::next(tok);
+            t = tokenizer::peek(tok);
+            let name = nil;
+            if t.t == "id" {
+                tokenizer::next(tok);
+                name = t.id;
+            };
+            return { t: "loop", name: name, body: __next_basic_stmt(tok) };
+        } else if t.kwd == "break" {
+            tokenizer::next(tok);
+            t = tokenizer::peek(tok);
+            if t.t == "id" {
+                tokenizer::next(tok);
+                return { t: "break", name: t.id };
+            };
+            return { t: "break", name: nil };
+        } else if t.kwd == "continue" {
+            tokenizer::next(tok);
+            t = tokenizer::peek(tok);
+            if t.t == "id" {
+                tokenizer::next(tok);
+                return { t: "continue", name: t.id };
+            };
+            return { t: "continue", name: nil };
+        } else if t.kwd == "return" {
+            tokenizer::next(tok);
+            return { t: "return", val: next_expr(tok, false) };
+        } else if t.kwd == "let" {
+            tokenizer::next(tok);
+            let t = tokenizer::next(tok);
+            if t.t != "id" {
+                parse_error(t, "expected name");
+            };
+            let id = t.id;
+            t = tokenizer::next(tok);
+            if t.t != "op" || t.op != "=" {
+                parse_error(t, "expected = in let stmt");
+            };
+            return { t: "let", id: id, val: next_expr(tok, false) };
+        } else if t.kwd == "fn" {
+            tokenizer::next(tok);
+            t = tokenizer::next(tok);
+            if t.t != "id" {
+                parse_error(t, "expected name");
+            };
+            let name = t.id;
+            let arg_names = __parse_arg_names(tok);
+            let body = __next_basic_stmt(tok);
+            return { t: "fn", arg_names: arg_names, body: body, name: name };
+        } else if t.kwd == "mod" {
+            tokenizer::next(tok);
+            t = tokenizer::next(tok);
+            if t.t != "id" {
+                parse_error(t, "expected name");
+            };
+            let name = t.id;
+            let body = nil;
+            t = tokenizer::peek(tok);
+            if t.t == "sym" && t.sym == "{" { 
+                tokenizer::next(tok);
+                body = next_stmt(tok);
+                t = tokenizer::next(tok);
+                if t.t != "sym" || t.sym != "}" {
+                    parse_error(t, "expected closing brace for module");
+                }
+            } else if t.t == "op" && t.op == "*" {
+                tokenizer::next(tok);
+                return { t: "mod", name: name, inner_import: true };
+            };
+            return { t: "mod", name: name, body: body, inner_import: false };
+        } else {
+            parse_error(t, "unexpected keyword");
+        }
+    } else {
+        return { t: "xpst", expr: next_expr(tok, false) };
+    }
+}
 
 fn next_expr(tok, no_op) {
     let x = __next_basic_expr(tok);
+    print("nx expr");
+    printv(x);
+    println("");
     loop {
         let t = tokenizer::peek(tok);
         if t.t == "op" {
             if no_op return x;
+            println("bop");
             tokenizer::next(tok);
-            return { t: "bop", left: x, right: next_expr(tok) };
+            return { t: "bop", op: t.op, left: x, right: next_expr(tok, false) };
         } else if t.t == "sym" {
             if t.sym == "(" {
                 tokenizer::next(tok);
@@ -26,7 +245,7 @@ fn next_expr(tok, no_op) {
                 t = tokenizer::peek(tok);
                 if ! (t.t == "sym" && t.sym == ")") {
                     loop {
-                        list::append(args, next_expr(tok));
+                        list::append(args, next_expr(tok, false));
                         t = tokenizer::next(tok);
                         if t.t == "sym" {
                             if t.sym == "," continue
@@ -39,7 +258,7 @@ fn next_expr(tok, no_op) {
                 x = { t: "call", func: x, args: args };
             } else if t.sym == "[" {
                 tokenizer::next(tok);
-                let ix = next_expr(tok);
+                let ix = next_expr(tok, false);
                 t = tokenizer::next(tok);
                 if ! (t.t == "sym" && t.sym == "]") {
                     parse_error(t, "expected closing square bracket for index");
@@ -47,7 +266,8 @@ fn next_expr(tok, no_op) {
                 x = { t: "index", val: x, ix: ix };
             } else break;
         } else break;
-    }
+    };
+    return x;
 }
 
 fn next_stmt(tok) {

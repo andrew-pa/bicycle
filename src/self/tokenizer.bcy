@@ -104,7 +104,7 @@ fn __next_token(tok) {
             if file::eof(tok.file) || !char::is_alphanumeric(pch) && pch != "_" break;
             str::append(id, file::next_char(tok.file));
         };
-        if list::contains(__keywords, id) {
+        if lists::contains(__keywords, id) {
             return token::keyword(tok, id);
         } else {
             return token::identifier(tok, id);

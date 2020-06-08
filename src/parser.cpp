@@ -2,7 +2,7 @@
 
 std::vector<size_t> parser::parse_fn_args(token t) {
 	std::vector<size_t> arg_names;
-	if (t.type != token::symbol && t.data != (size_t)symbol_type::open_paren) {
+	if (t.type != token::symbol || t.data != (size_t)symbol_type::open_paren) {
 		error(t, "expected open paren for function");
 	}
 	while (true) {
@@ -26,7 +26,7 @@ std::shared_ptr<ast::expression> parser::next_basic_expr() {
 		if (t.data == (size_t)symbol_type::open_paren) {
 			auto inside = this->next_expr();
 			auto t = tok->next();
-			if (t.type != token::symbol && t.data != (size_t)symbol_type::close_paren) {
+			if (t.type != token::symbol || t.data != (size_t)symbol_type::close_paren) {
 				error(t, "expected closing paren");
 			}
 			return inside;
@@ -51,23 +51,27 @@ std::shared_ptr<ast::expression> parser::next_basic_expr() {
 		}
 		else if (t.data == (size_t)symbol_type::open_brace) {
 			std::map<size_t, std::shared_ptr<ast::expression>> values;
-			while (true) {
-				t = tok->next();
-				if (t.type != token::identifer) { error(t, "unexpected token in map, expected key"); break; }
-				auto key = t.data;
-				t = tok->next();
-				if (t.type != token::symbol || t.data != (size_t)symbol_type::colon) {
-					error(t, "expected colon after key in map");
+			t = tok->peek();
+			if (!t.is_symbol(symbol_type::close_brace)) {
+				while (true) {
+					t = tok->next();
+					if (t.type != token::identifer) { error(t, "unexpected token in map, expected key"); break; }
+					auto key = t.data;
+					t = tok->next();
+					if (t.type != token::symbol || t.data != (size_t)symbol_type::colon) {
+						error(t, "expected colon after key in map");
+					}
+					values[key] = this->next_expr();
+					t = tok->next();
+					if (t.type == token::symbol) {
+						if (t.data == (size_t)symbol_type::close_brace) { break; }
+						else if (t.data == (size_t)symbol_type::comma) { continue; }
+					}
+					error(t, "unexpected token in map");
+					break;
 				}
-				values[key] = this->next_expr();
-				t = tok->next();
-				if (t.type == token::symbol) {
-					if (t.data == (size_t)symbol_type::close_brace) { break; }
-					else if (t.data == (size_t)symbol_type::comma) { continue; }
-				}
-				error(t, "unexpected token in map");
-				break;
 			}
+			else tok->next();
 			return std::make_shared<ast::map_value>(values);
 		}
 		else {
@@ -125,7 +129,7 @@ std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 		}
 		auto body = this->next_stmt();
 		t = tok->next();
-		if (t.type != token::symbol && t.data != (size_t)symbol_type::close_brace) {
+		if (t.type != token::symbol || t.data != (size_t)symbol_type::close_brace) {
 			error(t, "expected closing brace");
 		}
 		return std::make_shared<ast::block_stmt>(body);
@@ -201,7 +205,8 @@ std::shared_ptr<ast::statement> parser::next_basic_stmt() {
 			t = tok->next();
 			auto arg_names = this->parse_fn_args(t);
 			auto body = this->next_basic_stmt();
-			return std::make_shared<ast::let_stmt>(name, std::make_shared<ast::fn_value>(arg_names, body));
+			return std::make_shared<ast::let_stmt>(name,
+				std::make_shared<ast::fn_value>(arg_names, body, std::make_optional(tok->identifiers[name])));
 		}
 		case keyword_type::mod: {
 			tok->next();

@@ -219,14 +219,22 @@ namespace eval {
 	};
 
 	struct fn_value : public value {
+		std::optional<std::string> name;
 		std::vector<std::string> arg_names;
 		std::vector<std::shared_ptr<instr>> body;
 		std::shared_ptr<scope> closure;
 
-		fn_value(std::vector<std::string> an, std::vector<std::shared_ptr<instr>> body, std::shared_ptr<scope> c) : arg_names(an), body(body), closure(c) {}
+		fn_value(std::vector<std::string> an,
+			std::vector<std::shared_ptr<instr>> body,
+			std::shared_ptr<scope> c,
+			std::optional<std::string> name = std::nullopt) : arg_names(an), body(body), closure(c), name(name) {}
 
 		void print(std::ostream& out) override {
-			out << "fn(";
+			out << "fn";
+			if (name.has_value()) {
+				out << " " << name.value() << " ";
+			}
+			out << "(";
 			for (auto i = 0; i < arg_names.size(); ++i) {
 				out << arg_names[i];
 				if (i + 1 < arg_names.size()) out << ", ";
@@ -248,7 +256,7 @@ namespace eval {
 
 
 		eval::value* clone() override {
-			return new fn_value(arg_names, body, closure);
+			return new fn_value(arg_names, body, closure, name);
 		}
 	};
 
@@ -496,13 +504,19 @@ namespace eval {
 	};
 
 	struct make_closure_instr : public instr {
+		std::optional<std::string> name;
 		std::vector<std::string> arg_names;
 		std::vector<std::shared_ptr<instr>> body;
-		make_closure_instr(const std::vector<std::string>& arg_names, const std::vector<std::shared_ptr<instr>>& body)
-			: arg_names(arg_names), body(body) {}
+		make_closure_instr(const std::vector<std::string>& arg_names, 
+			const std::vector<std::shared_ptr<instr>>& body, std::optional<std::string> name = std::nullopt)
+			: arg_names(arg_names), body(body), name(name) {}
 
 		void print(std::ostream& out) override {
-			out << "closure fn(";
+			out << "closure fn"; 
+			if (name.has_value()) {
+				out << " " << name.value();
+			}
+			out << "(";
 			for (auto i = 0; i < arg_names.size(); ++i) {
 				out << arg_names[i];
 				if (i + 1 < arg_names.size()) out << ", ";
@@ -515,16 +529,25 @@ namespace eval {
 			out << std::endl;
 		}
 		void exec(interpreter* intp) override {
-			intp->stack.push(std::make_shared<fn_value>(arg_names, body, intp->current_scope));
+			intp->stack.push(std::make_shared<fn_value>(arg_names, body, intp->current_scope, name));
 		}
 	};
 
 	struct call_instr : public instr {
+		size_t num_args;
+
+		call_instr(size_t xar) : num_args(xar) {}
+
 		void exec(interpreter* intp) override {
 			auto fn = std::dynamic_pointer_cast<fn_value>(intp->stack.top()); intp->stack.pop();
+			if(fn->name.has_value()) std::cout << "call to " << fn->name.value() << std::endl;
 			auto fncx = std::make_shared<scope>(fn->closure == nullptr ? intp->global_scope : fn->closure);
+			if (num_args != fn->arg_names.size()) {
+				throw std::runtime_error("expected " + std::to_string(fn->arg_names.size()) +
+					" arguments but only got " + std::to_string(num_args));
+			}
 			for (auto an : fn->arg_names) {
-				if (intp->stack.empty()) throw std::runtime_error("expected more arguments for fn call");
+				if (intp->stack.empty()) throw std::runtime_error("expected more arguments for fn call, stack bottomed out");
 				fncx->bind(an, intp->stack.top()); intp->stack.pop();
 			}
 			interpreter fn_intp(fncx, fn->body);
@@ -606,9 +629,11 @@ namespace eval {
 	struct get_key_instr : public instr {
 		void exec(interpreter* intp) override {
 			auto n = std::dynamic_pointer_cast<str_value>(intp->stack.top()); intp->stack.pop();
-			if (n == nullptr) throw std::runtime_error("expected string key");
+			if (n == nullptr)
+				throw std::runtime_error("expected string key");
 			auto map = std::dynamic_pointer_cast<map_value>(intp->stack.top()); intp->stack.pop();
-			intp->stack.push(map->values[n->value]);
+			auto val = map->values.find(n->value);
+			intp->stack.push(val == map->values.end() ? std::make_shared<nil_value>() : val->second);
 		}
 		void print(std::ostream& out) override { out << "get key" << std::endl; }
 	};
@@ -617,7 +642,8 @@ namespace eval {
 		void exec(interpreter* intp) override {
 			auto v = intp->stack.top(); intp->stack.pop();
 			auto n = std::dynamic_pointer_cast<str_value>(intp->stack.top()); intp->stack.pop();
-			if (n == nullptr) throw std::runtime_error("expected string key");
+			if (n == nullptr)
+				throw std::runtime_error("expected string key");
 			auto map = std::dynamic_pointer_cast<map_value>(intp->stack.top());
 			map->values[n->value] = v;
 		}

@@ -265,7 +265,7 @@ int main(int argc, char* argv[]) {
 			}))
 		}, nullptr));
 	cx->bind("error", mk_sys_fn({ "msg" }, [](eval::interpreter* intrp) {
-		throw std::runtime_error(std::dynamic_pointer_cast<eval::str_value>(intrp->stack.top())->value);
+		throw std::runtime_error(std::dynamic_pointer_cast<eval::str_value>(intrp->current_scope->binding("msg"))->value);
 	}));
 	cx->modules["file"] = build_file_api();
 	cx->modules["str"] = build_str_api();

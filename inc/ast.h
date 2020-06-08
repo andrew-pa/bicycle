@@ -91,11 +91,13 @@ namespace ast {
 	};
 
 	struct fn_value : expression {
+		std::optional<std::string> name;
 		std::vector<size_t> args;
 		std::shared_ptr<statement> body;
 
-		fn_value(std::vector<size_t> args, std::shared_ptr<statement> body)
-			: args(args), body(body) {}
+		fn_value(std::vector<size_t> args, std::shared_ptr<statement> body,
+			std::optional<std::string> name = std::nullopt)
+			: args(args), body(body), name(name) {}
 
 		expr_visit_impl
 	};
@@ -467,7 +469,7 @@ namespace ast {
 		virtual void visit(map_value* x) override {
 			out << "{ ";
 			auto i = x->values.begin();
-			while(true) {
+			while(i != x->values.end()) {
 				out << ids->at(i->first) << ": ";
 				i->second->visit(this);
 				i++;
