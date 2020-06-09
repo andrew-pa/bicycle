@@ -13,4 +13,10 @@ read and execute a source file and/or evaluate expressions from the user
 usage: `bicycle_src_intrp (-i) ([input file])`  
 optional `-i` flag starts the REPL after reading the file if specified
 
+### `bicycle_vmi`
+
+read and execute a compiled bytecode file
+
+usage `bicycle_vmi [input file]`
+
 
