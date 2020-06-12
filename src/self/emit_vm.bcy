@@ -1,0 +1,196 @@
+mod std*;
+
+mod _emit {
+    let binary_ops = [
+        "+", "-", "*", "/", "==", "!=", "<", ">", "<=", ">=",
+        "&&", "||", "!", "=", "."
+    ];
+
+    fn discard(f) file::write_u8(f, 1);
+
+    fn duplicate(f) file::write_u8(f, 2);
+
+    fn literal_int(f, value) {
+        file::write_u8(f, 3);
+        file::write_u8(f, 1);
+        file::write_i32(f, value);
+    };
+
+    fn literal_str(f, value) {
+        file::write_u8(f, 3);
+        file::write_u8(f, 2);
+        file::write_str(f, value);
+    };
+
+    fn literal_bool(f, value) {
+        file::write_u8(f, 3);
+        file::write_u8(f, 3);
+        if value {
+            file::write_u8(f, 1);
+        } else {
+            file::write_u8(f, 0);
+        }
+    };
+    
+    fn literal_list(f) {
+        file::write_u8(f, 3);
+        file::write_u8(f, 4);
+    };
+
+    fn literal_map(f) {
+        file::write_u8(f, 3);
+        file::write_u8(f, 5);
+    };
+
+    fn get_binding(f, name) {
+        file::write_u8(f, 4);
+        file::write_str(f, name);
+    };
+
+    fn get_qualifed_binding(f, path) {
+        file::write_u8(f, 5);
+        let len = list::length(path);
+        file::write_u8(f, len);
+        let i = 0;
+        loop {
+            file::write_str(f, path[i]);
+            i = i + 1;
+            if i > len break;
+        }
+    };
+
+    fn set_binding(f, name) {
+        file::write_u8(f, 6);
+        file::write_str(f, name);
+    };
+
+    fn bind(f, name) {
+        file::write_u8(f, 7);
+        file::write_str(f, name);
+    };
+
+    fn enter_scope(f) file::write_u8(f, 8);
+
+    fn exit_scope(f) file::write_u8(f, 9);
+
+    fn exit_scope_as_new_module(f, name) {
+        file::write_u8(f, 10);
+        file::write_str(f, name);
+    };
+
+    fn if_then_else(f, thenm, elsem) {
+        file::write_u8(f, 11);
+        file::write_u32(f, thenm);
+        file::write_u32(f, elsem);
+    };
+
+    fn binary_op(f, op) {
+        file::write_u8(f, 12);
+        file::write_u8(f, lists::index_of(binary_ops, op));
+    };
+
+    fn logical_negation(f) file::write_u8(f, 13);
+
+    fn jump(f, loc) {
+        file::write_u8(f, 14);
+        file::write_u32(f, loc);
+    };
+
+    fn mark(f, id) {
+        file::write_u8(f, 15);
+        file::write_u32(f, id);
+    };
+
+    fn jump_to_mark(f, id) {
+        file::write_u8(f, 16);
+        file::write_u32(f, id);
+    };
+
+    fn make_closure(f, name, arg_names) {
+        file::write_u8(f, 17);
+        let anc = list::length(arg_names);
+        if name != nil {
+            anc = anc + 128;
+        };
+        file::write_u8(f, anc);
+        if name != nil {
+            file::write_str(f, name);
+        };
+        let i = 0;
+        loop {
+            if i >= list::length(arg_names) break;
+            file::write_str(f, arg_names[i]);
+            i = i + 1;
+        };
+    };
+
+    fn call(f, num_args) {
+        file::write_u8(f, 18);
+        file::write_u32(f, num_args);
+    };
+
+    fn ret(f) file::write_u8(f, 19);
+
+    fn get_index(f) file::write_u8(f, 30);
+    fn set_index(f) file::write_u8(f, 31);
+    fn get_key(f) file::write_u8(f, 32);
+    fn set_key(f) file::write_u8(f, 33);
+
+    fn append_list(f) file::write_u8(f, 50);
+
+    fn include_module(f, name, inner_import) {
+        file::write_u8(f, 64);
+        if inner_import {
+            file::write_u8(f, 1);
+        } else {
+            file::write_u8(f, 0);
+        };
+        file::write_u32(f, name);
+    }
+}
+
+fn emit_instrs_to_file(f, instrs) {
+    file::write_u64(f, list::length(instrs));
+    let table = {
+        discard: fn(i) _emit::discard(f),
+        dup: fn(i) _emit::duplicate(f),
+        int_l: fn(i) _emit::literal_int(f, i.value),
+        str_l: fn(i) _emit::literal_str(f, i.value),
+        bool_l: fn(i) _emit::literal_bool(f, i.value),
+        list_l: fn(i) _emit::literal_list(f),
+        map_l: fn(i) _emit::literal_map(f),
+        getb: fn(i) _emit::get_binding(f, i.name),
+        getqb: fn(i) _emit::get_qualifed_binding(f, i.path),
+        setb: fn(i) _emit::set_binding(f, i.name),
+        bind: fn(i) _emit::bind(f, i.name),
+        enter: fn(i) _emit::enter_scope(f),
+        exit: fn(i) _emit::exit_scope(f),
+        exit_nm: fn(i) _emit::exit_scope_as_new_module(f, i.name),
+        if_: fn(i) _emit::if_then_else(f, i.thenm, i.elsem),
+        bop: fn(i) _emit::binary_op(f, i.op),
+        lneg: fn(i) _emit::logical_negation(f),
+        jmp: fn(i) _emit::jump(f, i.loc),
+        mrk: fn(i) _emit::mark(f, i.id),
+        jmp_mrk: fn(i) _emit::jump_to_mark(f, i.id),
+        mk_closure: fn(i) {
+            _emit::make_closure(f, i.name, i.arg_names);
+            emit_instrs_to_file(f, i.instrs);
+        },
+        call: fn(i) _emit::call(f, i.num_args),
+        ret: fn(i) _emit::ret(f),
+        geti: fn(i) _emit::get_index(f),
+        seti: fn(i) _emit::set_index(f),
+        getk: fn(i) _emit::get_key(f),
+        setk: fn(i) _emit::set_key(f),
+        append_list: fn(i) _emit::append_list(f),
+        imod: fn(i) _emit::include_module(f, i.name, i.inner_import)
+    };
+    let i = 0;
+    loop {
+        table[instrs[i].t](instrs[i]);
+        printv(instrs[i]);
+        i = i + 1;
+        if i >= list::length(instrs) break;
+    }
+}
+

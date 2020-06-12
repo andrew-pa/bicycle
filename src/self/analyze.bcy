@@ -1,0 +1,302 @@
+mod std*;
+
+mod instr {
+    let binary_ops = [
+        "+", "-", "*", "/", "==", "!=", "<", ">", "<=", ">=",
+        "&&", "||", "!", "=", "."
+    ];
+
+    fn discard(f) list::append(f, {t: "discard"});
+
+    fn duplicate(f) list::append(f, {t: "dup"});
+
+    fn literal_int(f, value) {
+        list::append(f, {t: "int_l", value: value });
+    };
+
+    fn literal_str(f, value) {
+        list::append(f, {t: "str_l", value: value });
+    };
+
+    fn literal_bool(f, value) {
+        list::append(f, {t: "bool_l", value: value });
+    };
+    
+    fn literal_list(f) {
+        list::append(f, {t: "list_l"});
+    };
+
+    fn literal_map(f) {
+        list::append(f, {t: "map_l"});
+    };
+
+    fn get_binding(f, name) {
+        list::append(f, {t: "getb", name: name});
+    };
+
+    fn get_qualifed_binding(f, path) {
+        list::append(f, {t: "getqb", path: path});
+    };
+
+    fn set_binding(f, name) {
+        list::append(f, {t: "setb", name: name});
+    };
+
+    fn bind(f, name) {
+        list::append(f, {t: "bind", name: name});
+    };
+
+    fn enter_scope(f) list::append(f, {t: "enter"});
+
+    fn exit_scope(f) list::append(f, {t: "exit"});
+
+    fn exit_scope_as_new_module(f, name) {
+        list::append(f, {t: "exit_nm", name: name });
+    };
+
+    fn if_then_else(f, thenm, elsem) {
+        list::append(f, {t: "if_", thenm: thenm, elsem: elsem });
+    };
+
+    fn binary_op(f, op) {
+        list::append(f, {t: "bop", op: op});
+    };
+
+    fn logical_negation(f) list::append(f, {t:"lneg"});
+
+    fn jump(f, loc) {
+        list::append(f, { t: "jmp", loc: loc });
+    };
+
+    fn mark(f, id) {
+        list::append(f, { t: "mrk", id: id });
+    };
+
+    fn jump_to_mark(f, id) {
+        list::append(f, { t: "jmp_mrk", id: id });
+    };
+
+    fn make_closure(f, name, arg_names, instrs) {
+        list::append(f, { t: "mk_closure", name: name, arg_names: arg_names, instrs: instrs });
+    };
+
+    fn call(f, num_args) {
+        list::append(f, { t: "call", num_args: num_args });
+    };
+
+    fn ret(f) list::append(f, { t: "ret" });
+
+    fn get_index(f) list::append(f, {t: "geti"});
+    fn set_index(f) list::append(f, {t: "seti"});
+    fn get_key(f) list::append(f, {t: "getk"});
+    fn set_key(f) list::append(f, {t: "setk"});
+
+    fn append_list(f) list::append(f, {t: "append_list"});
+
+    fn include_module(f, name, inner_import) {
+        list::append(f, {t: "imod", name: name, inner_import: inner_import });
+    }
+}
+
+fn make_analyzer() {
+    return {
+        out: [],
+        next_marker: 1,
+        loop_marker_stack: []
+    };
+}
+
+fn __new_marker(anl) {
+    let m = anl.next_marker;
+    anl.next_marker = anl.next_marker + 1;
+    return m;
+}
+
+fn analyze_expr(anl, x) {
+    let table = {
+        list: fn(out, x) {
+            instr::literal_list(out);
+            let i = 0;
+            loop {
+                if i >= list::length(x.values) break;
+                analyze_expr(anl, (x.values)[i]);
+                instr::append_list(out);
+                i = i + 1;
+            }
+        },
+        map: fn(out, x) {
+            instr::literal_map(out);
+            let keys = map::keys(x.values);
+            let i = 0;
+            loop {
+                if i >= list::length(keys) break;
+                instr::literal_str(out, keys[i]); 
+                analyze_expr(anl, (x.values)[keys[i]]);
+                instr::set_key(out);
+                i = i + 1;
+            }
+        },
+        qfv: fn(out, x) instr::get_qualifed_binding(out, x.path),
+        id: fn(out, x) instr::get_binding(out, x.name),
+        num: fn(out, x) instr::literal_int(out, x.val),
+        str: fn(out, x) instr::literal_str(out, x.val),
+        bool: fn(out, x) instr::literal_bool(out, x.val),
+        fun: fn(out, x) {
+            let inner_anl = make_analyzer();
+            analyze_stmt(inner_anl, x.body);
+            instr::make_closure(out, nil, x.arg_names, inner_anl.out);
+        },
+        lnot: fn(out, x) {
+            analyze_expr(anl, x.val);
+            instr::logical_negation(out);
+        },
+        bop: fn(out, x) {
+            if x.op == "=" {
+                if x.left.t == "bop" && x.left.op == "." {
+                    analyze_expr(anl, x.left.left);
+                    if x.left.right.t != "id" error("expected id on left side of assignment");
+                    instr::literal_str(out, x.left.right.name);
+                    analyze_expr(anl, x.right);
+                    instr::set_key(out);
+                } else if x.left.t == "index" {
+                    analyze_expr(anl, x.left.col);
+                    analyze_expr(anl, x.left.ix);
+                    analyze_expr(anl, x.right);
+                    instr::set_index(out);
+                } else {
+                    analyze_expr(anl, x.right);
+                    if x.left.t != "id" error("expected id on left side of assignment");
+                    instr::set_binding(out, x.left.name);
+                }
+            } else if x.op == "." {
+                analyze_expr(anl, x.left);
+                instr::literal_str(out, x.left.name);
+                instr::get_key(out);
+            } else {
+                analyze_expr(anl, x.left);
+                analyze_expr(anl, x.right);
+                instr::binary_op(out, x.op);
+            }
+        },
+        index: fn(out, x) {
+            analyze_expr(anl, x.col);
+            analyze_expr(anl, x.ix);
+            instr::get_index(out);
+        },
+        call: fn(out, x) {
+            let i = list::length(x.args) - 1;
+            loop {
+                if i < 0 break;
+                analyze_expr(anl, (x.args)[i]);
+                i = i - 1;
+            };
+            analyze_expr(anl, x.func);
+            instr::call(out, list::length(x.args));
+        }
+    };
+    table[x.t](anl.out, x);
+}
+
+fn analyze_stmt(anl, s) {
+    let table = {
+        seq: fn() {
+            analyze_stmt(anl, s.fst);
+            if s.sec != nil analyze_stmt(anl, s.sec);
+        },
+        block: fn() {
+            if s.body != nil {
+                instr::enter_scope(anl.out);
+                analyze_stmt(anl, s.body);
+                instr::exit_scope(anl.out);
+            }
+        },
+        if_: fn() {
+            analyze_expr(anl, s.cond);
+            let true_mk = __new_marker(anl);
+            let false_mk = __new_marker(anl);
+            instr::if_then_else(anl.out, true_mk, false_mk);
+            instr::mark(anl.out, true_mk);
+            analyze_stmt(anl, s.then_stmt);
+            if s.else_stmt != nil {
+                let end_mk = __new_marker(anl);
+                instr::jump_to_mark(anl.out, end_mk);
+                instr::mark(anl.out, false_mk);
+                analyze_stmt(anl, s.else_stmt);
+                instr::mark(anl.out, end_mk);
+            } else {
+                instr::mark(anl.out, false_mk);
+            }
+        },
+        loop_: fn() {
+            let start = list::length(anl.out);
+            let endm = __new_marker(anl);
+            list::append(anl.loop_marker_stack, { name: s.name, start: start, end: endm });
+            analyze_stmt(anl, s.body);
+            instr::jump(anl.out, start);
+            instr::mark(anl.out, endm);
+            list::pop(anl.loop_marker_stack);
+        },
+        break_: fn() {
+            let endm = 0;
+            if s.name != nil {
+                let i = list::length(anl.loop_marker_stack) - 1;
+                loop {
+                    if i <= 0 break;
+                    if (anl.loop_marker_stack)[i].name == s.name {
+                        endm = ( anl.loop_marker_stack )[i].end;
+                        break;
+                    };
+                    i = i - 1;
+                }
+            } else {
+                endm = ( anl.loop_marker_stack )[list::length(anl.loop_marker_stack) - 1].end;
+            };
+            instr::jump_to_mark(anl.out, endm);
+        },
+        continue_: fn() {
+            let start = 0;
+            if s.name != nil {
+                let i = list::length(anl.loop_marker_stack) - 1;
+                loop {
+                    if i <= 0 break;
+                    if ( anl.loop_marker_stack )[i].name == s.name {
+                        start = ( anl.loop_marker_stack )[i].start;
+                        break;
+                    };
+                    i = i - 1;
+                }
+            } else {
+                start = ( anl.loop_marker_stack )[list::length(anl.loop_marker_stack) - 1].start;
+            };
+            instr::jump(anl.out, start);
+        },
+        return_: fn() {
+            analyze_expr(anl, s.val);
+            instr::ret(anl.out);
+        },
+        let_: fn() {
+            analyze_expr(anl, s.val);
+            instr::bind(anl.out, s.id);
+        },
+        fn_: fn() {
+            let inner_anl = make_analyzer();
+            analyze_stmt(inner_anl, s.body);
+            instr::make_closure(anl.out, s.name, s.arg_names, inner_anl.out);
+            instr::bind(anl.out, s.name);
+        },
+        mod_: fn() {
+            if s.body == nil {
+                instr::include_module(anl.out, s.name, s.inner_import);
+            } else {
+                instr::enter_scope(anl.out);
+                analyze_stmt(anl, s.body);
+                instr::exit_scope_as_new_module(anl.out, s.name);
+            }
+        },
+        xpst: fn() {
+            analyze_expr(anl, s.expr);
+            instr::discard(anl.out);
+        }
+    };
+    table[s.t]();
+}

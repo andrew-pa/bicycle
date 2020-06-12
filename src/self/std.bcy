@@ -14,6 +14,15 @@ mod lists {
             if list[i] == value return true;
             i = i + 1;
         }
+    };
+
+    fn index_of(list, value) {
+        let i = 0;
+        loop {
+            if i >= list::length(list) return -1;
+            if list[i] == value return i;
+            i = i + 1;
+        }
     }
 }
 

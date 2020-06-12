@@ -7,4 +7,7 @@ fn print1to10() {
     }
 }
 
+fn start(a) {
+    print1to10();
+}
 

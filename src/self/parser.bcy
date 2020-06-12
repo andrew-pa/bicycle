@@ -111,7 +111,7 @@ fn __next_basic_expr(tok) {
         } else if t.kwd = "fn" {
             let arg_names = __parse_arg_names(tok);
             let body = __next_basic_stmt(tok);
-            return { t: "fn", arg_names: arg_names, body: body };
+            return { t: "fun", arg_names: arg_names, body: body };
         } else {
             parse_error(t, "unexpected keyword in start of expression");
         }
@@ -146,7 +146,7 @@ fn __next_basic_stmt(tok) {
                 tokenizer::next(tok);
                 iff = __next_basic_stmt(tok);
             };
-            return { t: "if", cond: cond, then_stmt: ift, else_stmt: iff };
+            return { t: "if_", cond: cond, then_stmt: ift, else_stmt: iff };
         } else if t.kwd == "loop" {
             tokenizer::next(tok);
             t = tokenizer::peek(tok);
@@ -155,26 +155,26 @@ fn __next_basic_stmt(tok) {
                 tokenizer::next(tok);
                 name = t.id;
             };
-            return { t: "loop", name: name, body: __next_basic_stmt(tok) };
+            return { t: "loop_", name: name, body: __next_basic_stmt(tok) };
         } else if t.kwd == "break" {
             tokenizer::next(tok);
             t = tokenizer::peek(tok);
             if t.t == "id" {
                 tokenizer::next(tok);
-                return { t: "break", name: t.id };
+                return { t: "break_", name: t.id };
             };
-            return { t: "break", name: nil };
+            return { t: "break_", name: nil };
         } else if t.kwd == "continue" {
             tokenizer::next(tok);
             t = tokenizer::peek(tok);
             if t.t == "id" {
                 tokenizer::next(tok);
-                return { t: "continue", name: t.id };
+                return { t: "continue_", name: t.id };
             };
-            return { t: "continue", name: nil };
+            return { t: "continue_", name: nil };
         } else if t.kwd == "return" {
             tokenizer::next(tok);
-            return { t: "return", val: next_expr(tok, false) };
+            return { t: "return_", val: next_expr(tok, false) };
         } else if t.kwd == "let" {
             tokenizer::next(tok);
             let t = tokenizer::next(tok);
@@ -186,7 +186,7 @@ fn __next_basic_stmt(tok) {
             if t.t != "op" || t.op != "=" {
                 parse_error(t, "expected = in let stmt");
             };
-            return { t: "let", id: id, val: next_expr(tok, false) };
+            return { t: "let_", id: id, val: next_expr(tok, false) };
         } else if t.kwd == "fn" {
             tokenizer::next(tok);
             t = tokenizer::next(tok);
@@ -196,7 +196,7 @@ fn __next_basic_stmt(tok) {
             let name = t.id;
             let arg_names = __parse_arg_names(tok);
             let body = __next_basic_stmt(tok);
-            return { t: "fn", arg_names: arg_names, body: body, name: name };
+            return { t: "fn_", arg_names: arg_names, body: body, name: name };
         } else if t.kwd == "mod" {
             tokenizer::next(tok);
             t = tokenizer::next(tok);
@@ -215,15 +215,66 @@ fn __next_basic_stmt(tok) {
                 }
             } else if t.t == "op" && t.op == "*" {
                 tokenizer::next(tok);
-                return { t: "mod", name: name, inner_import: true };
+                return { t: "mod_", name: name, inner_import: true };
             };
-            return { t: "mod", name: name, body: body, inner_import: false };
+            return { t: "mod_", name: name, body: body, inner_import: false };
         } else {
             parse_error(t, "unexpected keyword");
         }
     } else {
         return { t: "xpst", expr: next_expr(tok, false) };
     }
+}
+
+let operator_precedence = {};
+operator_precedence["+"] = 14;
+operator_precedence["-"] = 14;
+operator_precedence["*"] = 15;
+operator_precedence["/"] = 15;
+
+operator_precedence["=="] = 11;
+operator_precedence["!="] = 11;
+
+operator_precedence["<"] = 12;
+operator_precedence[">"] = 12;
+operator_precedence["<="] = 12;
+operator_precedence[">="] = 12;
+
+operator_precedence["&&"] = 6;
+operator_precedence["||"] = 5;
+
+operator_precedence["="] = 3;
+operator_precedence["."] = 20;
+
+fn __make_binary_op_ast(op, left, right) {
+    if right.t == "bop" {
+        if operator_precedence[op] > operator_precedence[right.op] {
+            return {
+                t: "bop",
+                op: right.op,
+                left: {
+                    t: "bop",
+                    op: op,
+                    left: left,
+                    right: right.left
+                },
+                right: right.right
+            };
+        } else if op == right.op && op == "." {
+            return {
+                t: "bop",
+                op: op,
+                left: {
+                    t: "bop",
+                    op: op,
+                    left: left,
+                    right: right.left
+                },
+                right: right.right
+            };
+        }
+    };
+    return { t: "bop", op: op, left: left, right: right };
 }
 
 fn next_expr(tok, no_op) {
@@ -237,7 +288,7 @@ fn next_expr(tok, no_op) {
             if no_op return x;
             println("bop");
             tokenizer::next(tok);
-            return { t: "bop", op: t.op, left: x, right: next_expr(tok, false) };
+            return __make_binary_op_ast(t.op, x, next_expr(tok, false));
         } else if t.t == "sym" {
             if t.sym == "(" {
                 tokenizer::next(tok);
@@ -263,7 +314,7 @@ fn next_expr(tok, no_op) {
                 if ! (t.t == "sym" && t.sym == "]") {
                     parse_error(t, "expected closing square bracket for index");
                 };
-                x = { t: "index", val: x, ix: ix };
+                x = { t: "index", col: x, ix: ix };
             } else break;
         } else break;
     };

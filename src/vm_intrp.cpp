@@ -39,11 +39,15 @@ std::vector<std::shared_ptr<eval::instr>> load_code(char*& buf, std::filesystem:
 			auto type = *buf; buf += 1;
 			switch (type) {
 			case 0: instrs.push_back(std::make_shared<eval::literal_instr>(std::make_shared<eval::nil_value>())); break;
-			case 1: instrs.push_back(std::make_shared<eval::literal_instr>(std::make_shared<eval::int_value>(*((uint32_t*)buf)))); buf += sizeof(uint32_t); break;
+			case 1:
+				instrs.push_back(std::make_shared<eval::literal_instr>(std::make_shared<eval::int_value>(*((int32_t*)buf))));
+				buf += sizeof(int32_t);
+				break;
 			case 2: instrs.push_back(std::make_shared<eval::literal_instr>(std::make_shared<eval::str_value>(load_str(buf)))); break;
 			case 3: instrs.push_back(std::make_shared<eval::literal_instr>(std::make_shared<eval::bool_value>(*buf))); buf += 1; break;
 			case 4: instrs.push_back(std::make_shared<eval::literal_instr>(std::make_shared<eval::list_value>())); break;
 			case 5: instrs.push_back(std::make_shared<eval::literal_instr>(std::make_shared<eval::map_value>())); break;
+			default: throw std::runtime_error("unexpected literal type " + std::to_string(type));
 			}
 		} break;
 
@@ -146,6 +150,8 @@ int main(int argc, char* argv[]) {
 	code.push_back(std::make_shared<eval::literal_instr>(std::make_shared<eval::list_value>(vargs)));
 	code.push_back(std::make_shared<eval::get_binding_instr>("start"));
 	code.push_back(std::make_shared<eval::call_instr>(1));
+	
+	for (auto c : code) c->print(std::cout);
 
 	eval::interpreter intp(cx, code);
 	try {

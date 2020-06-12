@@ -30,7 +30,10 @@ struct ios_value : eval::value {
 	}
 
 	~ios_value() {
-		if(f) fclose(f);
+		if (f) {
+			fflush(f);
+			fclose(f);
+		}
 	}
 };
 
@@ -39,6 +42,10 @@ std::shared_ptr<eval::scope> build_file_api() {
 	mod->bind("open", mk_sys_fn({"path"}, [](eval::interpreter* intrp) {
 		auto path = std::dynamic_pointer_cast<eval::str_value>(intrp->current_scope->binding("path"));
 		intrp->stack.push(std::make_shared<ios_value>(path->value, "r"));
+	}));
+	mod->bind("create", mk_sys_fn({"path"}, [](eval::interpreter* intrp) {
+		auto path = std::dynamic_pointer_cast<eval::str_value>(intrp->current_scope->binding("path"));
+		intrp->stack.push(std::make_shared<ios_value>(path->value, "w"));
 	}));
 	mod->bind("next_char", mk_sys_fn({"file"}, [](eval::interpreter* intrp) {
 		auto f = std::dynamic_pointer_cast<ios_value>(intrp->current_scope->binding("file"));
@@ -57,6 +64,42 @@ std::shared_ptr<eval::scope> build_file_api() {
 		auto f = std::dynamic_pointer_cast<ios_value>(intrp->current_scope->binding("file"));
 		intrp->stack.push(std::make_shared<eval::bool_value>(feof(f->f) != 0));
 	}));
+
+	mod->bind("write_u8", mk_sys_fn({ "file", "v" }, [](eval::interpreter* intrp) {
+		auto f = std::dynamic_pointer_cast<ios_value>(intrp->current_scope->binding("file"));
+		auto v = std::dynamic_pointer_cast<eval::int_value>(intrp->current_scope->binding("v"));
+		char value = v->value;
+		fwrite(&value, sizeof(char), 1, f->f);
+	}));
+
+	mod->bind("write_u32", mk_sys_fn({ "file", "v" }, [](eval::interpreter* intrp) {
+		auto f = std::dynamic_pointer_cast<ios_value>(intrp->current_scope->binding("file"));
+		auto v = std::dynamic_pointer_cast<eval::int_value>(intrp->current_scope->binding("v"));
+		uint32_t value = v->value;
+		fwrite(&value, sizeof(uint32_t), 1, f->f);
+	}));
+
+	mod->bind("write_i32", mk_sys_fn({ "file", "v" }, [](eval::interpreter* intrp) {
+		auto f = std::dynamic_pointer_cast<ios_value>(intrp->current_scope->binding("file"));
+		auto v = std::dynamic_pointer_cast<eval::int_value>(intrp->current_scope->binding("v"));
+		int32_t value = v->value;
+		fwrite(&value, sizeof(int32_t), 1, f->f);
+	}));
+
+	mod->bind("write_u64", mk_sys_fn({ "file", "v" }, [](eval::interpreter* intrp) {
+		auto f = std::dynamic_pointer_cast<ios_value>(intrp->current_scope->binding("file"));
+		auto v = std::dynamic_pointer_cast<eval::int_value>(intrp->current_scope->binding("v"));
+		uint64_t value = v->value;
+		fwrite(&value, sizeof(uint64_t), 1, f->f);
+	}));
+
+	mod->bind("write_str", mk_sys_fn({ "file", "v" }, [](eval::interpreter* intrp) {
+		auto f = std::dynamic_pointer_cast<ios_value>(intrp->current_scope->binding("file"));
+		auto v = std::dynamic_pointer_cast<eval::str_value>(intrp->current_scope->binding("v"));
+		fwrite(v->value.data(), sizeof(char), v->value.length()+1, f->f);
+	}));
+
+
 	return mod;
 }
 
@@ -100,8 +143,29 @@ std::shared_ptr<eval::scope> build_list_api() {
 		s->values.push_back(c);
 		intrp->stack.push(s);
 	}));
+	mod->bind("pop", mk_sys_fn({"lst"}, [](eval::interpreter* intrp) {
+		auto s = std::dynamic_pointer_cast<eval::list_value>(intrp->current_scope->binding("lst"));
+		if (s->values.size() == 0) throw std::runtime_error("tried to pop list of len 0");
+		auto t = s->values[s->values.size() - 1];
+		s->values.pop_back();
+		intrp->stack.push(t);
+	}));
 	return mod;
 }
+
+std::shared_ptr<eval::scope> build_map_api() {
+	auto mod = std::make_shared<eval::scope>(nullptr);
+	mod->bind("keys", mk_sys_fn({ "map" }, [](eval::interpreter* intrp) {
+		auto map = std::dynamic_pointer_cast<eval::map_value>(intrp->current_scope->binding("map"));
+		std::vector<std::shared_ptr<eval::value>> keys;
+		for (auto kvp : map->values) {
+			keys.push_back(std::make_shared<eval::str_value>(kvp.first));
+		}
+		intrp->stack.push(std::make_shared<eval::list_value>(keys));
+	}));
+	return mod;
+}
+
 
 std::shared_ptr<eval::scope> create_global_std_scope() {
 	auto cx = std::make_shared<eval::scope>(nullptr);
@@ -131,6 +195,7 @@ std::shared_ptr<eval::scope> create_global_std_scope() {
 	cx->modules["file"] = build_file_api();
 	cx->modules["str"] = build_str_api();
 	cx->modules["list"] = build_list_api();
+	cx->modules["map"] = build_map_api();
 
 	return cx;
 }

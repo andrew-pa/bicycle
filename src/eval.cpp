@@ -50,7 +50,7 @@ void eval::analyzer::visit(ast::if_stmt* s) {
 void eval::analyzer::visit(ast::continue_stmt* s) {
 	auto start = 0;
 	if (s->name.has_value()) {
-		for (size_t i = loop_marker_stack.size() - 1; i >= 0; --i) {
+		for (int i = loop_marker_stack.size() - 1; i >= 0; --i) {
 			auto loop = loop_marker_stack[i];
 			if (std::get<0>(loop).has_value() && std::get<0>(loop).value() == s->name.value()) {
 				start = std::get<1>(loop);
@@ -233,7 +233,6 @@ std::vector<std::shared_ptr<eval::instr>> eval::load_and_assemble(const std::fil
 	while (!tok.peek().is_eof()) {
 		try {
 			auto stmt = par.next_stmt();
-			std::cout << std::endl;
 			eval::analyzer anl(&tok.identifiers, path.parent_path());
 			auto part = anl.analyze(stmt);
 			code.insert(code.end(), std::make_move_iterator(part.begin()), std::make_move_iterator(part.end()));

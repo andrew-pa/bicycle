@@ -272,11 +272,11 @@ namespace eval {
 			std::cout << "stack [";
 			if(stack.size() > 0) stack.top()->print(std::cout);
 			std::cout << "] scope {";
-			for (auto b : current_scope->bindings) {
+			/*for (auto b : current_scope->bindings) {
 				std::cout << b.first << "=";
 				b.second->print(std::cout);
 				std::cout << " ";
-			}
+			}*/
 			std::cout << "} cur instr =";
 			code[pc]->print(std::cout);
 		}
@@ -598,14 +598,15 @@ namespace eval {
 		void exec(interpreter* intp) override {
 			auto v = intp->stack.top(); intp->stack.pop();
 			auto ix = intp->stack.top(); intp->stack.pop();
-			auto list = std::dynamic_pointer_cast<list_value>(intp->stack.top()); intp->stack.pop();
+			auto col = intp->stack.top(); intp->stack.pop();
+			auto list = std::dynamic_pointer_cast<list_value>(col);
 			if (list != nullptr) {
 				auto i = std::dynamic_pointer_cast<int_value>(ix);
 				if (i == nullptr) throw std::runtime_error("expected int index to list");
 				list->values[i->value] = v;
 				return;
 			}
-			auto map = std::dynamic_pointer_cast<map_value>(intp->stack.top());
+			auto map = std::dynamic_pointer_cast<map_value>(col);
 			if (map != nullptr) {
 				auto n = std::dynamic_pointer_cast<str_value>(ix);
 				if (n == nullptr) throw std::runtime_error("expected string key");

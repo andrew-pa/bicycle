@@ -103,12 +103,12 @@ void load_file(tokenizer* tok, parser* par, std::shared_ptr<eval::scope> cx, std
 	while (!tok->peek().is_eof()) {
 		try {
 			auto stmt = par->next_stmt();
-			stmt->visit(&printer);
-			std::cout << std::endl;
+			//stmt->visit(&printer);
+			//std::cout << std::endl;
 			eval::analyzer anl(&tok->identifiers, path.parent_path());
 			eval::interpreter intp(cx, anl.analyze(stmt));
-			std::cout << std::endl;
-			for (auto c : intp.code) c->print(std::cout);
+			//std::cout << std::endl;
+			//for (auto c : intp.code) c->print(std::cout);
 			intp.run();
 		}
 		catch (const parse_error& pe) {
@@ -154,6 +154,9 @@ int main(int argc, char* argv[]) {
 			if (line == "!r") {
 				if (file.has_value()) load_file(&tk, &p, cx, file.value());
 				continue;
+			}
+			if (line == "!q") {
+				break;
 			}
 			std::istringstream s(line);
 			tk.reset(&s);
