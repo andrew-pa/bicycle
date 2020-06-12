@@ -32,7 +32,7 @@ std::vector<std::shared_ptr<eval::instr>> load_code(char*& buf, std::filesystem:
 	std::vector<std::shared_ptr<eval::instr>> instrs;
 	for (auto i = 0; i < num_instrs; ++i) {
 		auto op = *buf; buf += 1;
-		std::cout << "offset = " << (buf - start) << std::endl;
+		//std::cout << "offset = " << (buf - start) << std::endl;
 		switch (op) {
 		case 0: /*nop*/ break;
 		case 1: instrs.push_back(std::make_shared<eval::discard_instr>()); break;
@@ -117,8 +117,6 @@ std::vector<std::shared_ptr<eval::instr>> load_code(char*& buf, std::filesystem:
 	return instrs;
 }
 
-#include <Windows.h>
-
 std::vector<std::shared_ptr<eval::instr>> load_file(const std::filesystem::path& path) {
 	try {
 		/*std::ifstream input(path, std::ios::binary);
@@ -128,12 +126,12 @@ std::vector<std::shared_ptr<eval::instr>> load_file(const std::filesystem::path&
 		std::vector<uint8_t> buf(size, 0);
 		fread(buf.data(), sizeof(uint8_t), size, f);
 		fclose(f);
-		std::cout << std::hex;
+		/*std::cout << std::hex;
 		for (auto i = 0; i < buf.size(); ++i) {
 			std::cout << (uint32_t)buf[i] << " ";
 			if (i > 0 && i % 8 == 0) std::cout << std::endl;
 		}
-		std::cout << std::dec << std::endl;
+		std::cout << std::dec << std::endl;*/
 		char* pbuf = (char*)buf.data();
 		auto code = load_code(pbuf, path.parent_path());
 		return code;
@@ -166,7 +164,7 @@ int main(int argc, char* argv[]) {
 	code.push_back(std::make_shared<eval::get_binding_instr>("start"));
 	code.push_back(std::make_shared<eval::call_instr>(1));
 	
-	for (auto c : code) c->print(std::cout);
+	//for (auto c : code) c->print(std::cout);
 
 	eval::interpreter intp(cx, code);
 	try {

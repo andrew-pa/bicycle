@@ -72,9 +72,10 @@ macro mad:expr
 	-> start()
 */
 
-std::tuple<bool, std::optional<std::filesystem::path>> process_args(const std::vector<std::string>& args) {
+std::tuple<bool, std::optional<std::filesystem::path>, std::vector<std::string>> process_args(const std::vector<std::string>& args) {
 	bool use_repl = false;
 	auto file = std::optional<std::filesystem::path>();
+	auto prog_args = std::vector<std::string>();
 
 	if (args.size() == 0) {
 		std::cout << "pass a filename and/or -i to open the REPL" << std::endl;
@@ -84,6 +85,11 @@ std::tuple<bool, std::optional<std::filesystem::path>> process_args(const std::v
 		if (args[i] == "-i") {
 			use_repl = true;
 		}
+		else if (args[i] == "--") {
+			for (auto j = i + 1; j < args.size(); ++j)
+				prog_args.push_back(args[j]);
+			break;
+		}
 		else if(args[i][0] == '-' || file.has_value()) {
 			std::cout << "unknown argument " << args[i] << std::endl;
 		}
@@ -92,7 +98,7 @@ std::tuple<bool, std::optional<std::filesystem::path>> process_args(const std::v
 		}
 	}
 	
-	return std::tuple{ use_repl, file };
+	return std::tuple{ use_repl, file, prog_args };
 }
 
 void load_file(tokenizer* tok, parser* par, std::shared_ptr<eval::scope> cx, std::filesystem::path path) {
@@ -136,7 +142,7 @@ void load_file(tokenizer* tok, parser* par, std::shared_ptr<eval::scope> cx, std
 int main(int argc, char* argv[]) {
 	std::vector<std::string> args;
 	for (auto i = 1; i < argc; ++i) args.push_back(std::string(argv[i]));
-	auto [use_repl, file] = process_args(args);
+	auto [use_repl, file, prog_args] = process_args(args);
 
 	tokenizer tk(nullptr);
 	parser p(&tk);
@@ -186,6 +192,29 @@ int main(int argc, char* argv[]) {
 			catch (const std::runtime_error& e) {
 				std::cout << "error: " << e.what();
 			}
+		}
+	} else if(file.has_value()) {
+		auto vargs = std::vector<std::shared_ptr<eval::value>>();
+		vargs.reserve(prog_args.size() + 1);
+		vargs.push_back(std::make_shared<eval::str_value>(file.value().u8string()));
+		for (auto a : prog_args) {
+			vargs.push_back(std::make_shared<eval::str_value>(a));
+		}
+
+		std::vector<std::shared_ptr<eval::instr>> code;
+		code.push_back(std::make_shared<eval::literal_instr>(std::make_shared<eval::list_value>(vargs)));
+		code.push_back(std::make_shared<eval::get_binding_instr>("start"));
+		code.push_back(std::make_shared<eval::call_instr>(1));
+
+		eval::interpreter intp(cx, code);
+		try {
+			auto res = std::dynamic_pointer_cast<eval::int_value>(intp.run());
+			if (res != nullptr) return res->value;
+			else return 0;
+		}
+		catch (const std::runtime_error& e) {
+			std::cout << "error in start: " << e.what() << std::endl;
+			return -1;
 		}
 	}
 }

@@ -124,3 +124,15 @@ let amap = {a: 3, b: 4};
 amap["a"] == 3;
 amap.b == 4;
 ```
+
+## runtime
+Both `bicycle_vmi` and `bicycle_src_intrp` expect to find a `start` function that takes one parameter, the command line arguments, like so:
+
+```rust
+fn start(args) {
+    println("Hello, here are the command line arguments: ");
+    printv(args);
+}
+```
+
+There are a number of APIs defined at the moment by the VM, although they may be subject to change. These include some file APIs like C, and a few functions for working with strings/lists/maps. The definitions can be found in `src/intrp_std.cpp`.
