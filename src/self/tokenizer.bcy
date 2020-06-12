@@ -3,7 +3,7 @@ mod std*;
 fn make_tokenizer(file) {
     return {
         file: file,
-        line_number: 0,
+        line_number: 1,
         start_of_line: 0,
         next_token: nil
     };
@@ -50,7 +50,7 @@ fn __next_token(tok) {
             file::next_char(tok.file);
             return token::symbol(tok, "::");
         };
-        return token::symbol(":");
+        return token::symbol(tok, ":");
     } else if ch == "=" {
         if file::peek_char(tok.file) == ">" {
             file::next_char(tok.file);

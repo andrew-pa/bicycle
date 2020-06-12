@@ -45,7 +45,7 @@ std::shared_ptr<eval::scope> build_file_api() {
 	}));
 	mod->bind("create", mk_sys_fn({"path"}, [](eval::interpreter* intrp) {
 		auto path = std::dynamic_pointer_cast<eval::str_value>(intrp->current_scope->binding("path"));
-		intrp->stack.push(std::make_shared<ios_value>(path->value, "w"));
+		intrp->stack.push(std::make_shared<ios_value>(path->value, "wb"));
 	}));
 	mod->bind("next_char", mk_sys_fn({"file"}, [](eval::interpreter* intrp) {
 		auto f = std::dynamic_pointer_cast<ios_value>(intrp->current_scope->binding("file"));
@@ -69,6 +69,7 @@ std::shared_ptr<eval::scope> build_file_api() {
 		auto f = std::dynamic_pointer_cast<ios_value>(intrp->current_scope->binding("file"));
 		auto v = std::dynamic_pointer_cast<eval::int_value>(intrp->current_scope->binding("v"));
 		char value = v->value;
+		std::cout << "w8 " << (uint32_t)value << std::endl;
 		fwrite(&value, sizeof(char), 1, f->f);
 	}));
 

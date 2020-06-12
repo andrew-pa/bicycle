@@ -169,8 +169,10 @@ fn analyze_expr(anl, x) {
                     instr::set_binding(out, x.left.name);
                 }
             } else if x.op == "." {
+                println("XOP-DOT");
+                printv(x);
                 analyze_expr(anl, x.left);
-                instr::literal_str(out, x.left.name);
+                instr::literal_str(out, x.right.name);
                 instr::get_key(out);
             } else {
                 analyze_expr(anl, x.left);

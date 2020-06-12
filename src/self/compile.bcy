@@ -4,12 +4,14 @@ mod analyze;
 mod emit_vm;
 
 fn start(args) {
-    let tok = tokenizer::make_tokenizer(file::open(str::concat(args[1], ".bcy")));
+    let tok = tokenizer::make_tokenizer(file::open(args[1]));
     let anl = analyze::make_analyzer();
     loop {
         if tokenizer::peek(tok).t == "eof" break;
-        analyze::analyze_stmt(anl, parser::next_stmt(tok));
+        let s = parser::next_stmt(tok);
+        printv(s);
+        analyze::analyze_stmt(anl, s);
     };
     printv(anl);
-    emit_vm::emit_instrs_to_file(file::create(str::concat(args[1], ".bcc")), anl.out);
+    emit_vm::emit_instrs_to_file(file::create(args[2]), anl.out);
 }

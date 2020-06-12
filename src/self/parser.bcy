@@ -46,7 +46,7 @@ fn __next_basic_expr(tok) {
                 loop {
                     list::append(values, next_expr(tok, false));
                     t = tokenizer::next(tok);
-                    if t.t = "sym" {
+                    if t.t == "sym" {
                         if t.sym == "]" break
                         else if t.sym == "," continue;
                     };
@@ -57,6 +57,7 @@ fn __next_basic_expr(tok) {
             return { t: "list", values: values };
         } else if t.sym == "{" {
             let values = {};
+            t = tokenizer::peek(tok);
             if t.t != "sym" || t.sym != "}" {
                 loop {
                     t = tokenizer::next(tok);
@@ -71,7 +72,7 @@ fn __next_basic_expr(tok) {
                     };
                     values[key] = next_expr(tok, false);
                     t = tokenizer::next(tok);
-                    if t.t = "sym" {
+                    if t.t == "sym" {
                         if t.sym == "}" break
                         else if t.sym == "," continue;
                     };
@@ -86,7 +87,7 @@ fn __next_basic_expr(tok) {
     } else if t.t == "id" {
         let name = t.id;
         let nt = tokenizer::peek(tok);
-        if nt.t == "sym" && t.sym == "::" {
+        if nt.t == "sym" && nt.sym == "::" {
             let path = [ name ];
             loop {
                 tokenizer::next(tok);
@@ -106,9 +107,9 @@ fn __next_basic_expr(tok) {
     } else if t.t == "kwd" {
         if t.kwd == "true" {
             return { t: "bool", val: true };
-        } else if t.kwd = "false" {
+        } else if t.kwd == "false" {
             return { t: "bool", val: false };
-        } else if t.kwd = "fn" {
+        } else if t.kwd == "fn" {
             let arg_names = __parse_arg_names(tok);
             let body = __next_basic_stmt(tok);
             return { t: "fun", arg_names: arg_names, body: body };
@@ -252,24 +253,14 @@ fn __make_binary_op_ast(op, left, right) {
             return {
                 t: "bop",
                 op: right.op,
-                left: {
-                    t: "bop",
-                    op: op,
-                    left: left,
-                    right: right.left
-                },
+                left: __make_binary_op_ast(op, left, right.left),
                 right: right.right
             };
         } else if op == right.op && op == "." {
             return {
                 t: "bop",
                 op: op,
-                left: {
-                    t: "bop",
-                    op: op,
-                    left: left,
-                    right: right.left
-                },
+                left: __make_binary_op_ast(op, left, right.left),
                 right: right.right
             };
         }
@@ -279,14 +270,10 @@ fn __make_binary_op_ast(op, left, right) {
 
 fn next_expr(tok, no_op) {
     let x = __next_basic_expr(tok);
-    print("nx expr");
-    printv(x);
-    println("");
     loop {
         let t = tokenizer::peek(tok);
         if t.t == "op" {
             if no_op return x;
-            println("bop");
             tokenizer::next(tok);
             return __make_binary_op_ast(t.op, x, next_expr(tok, false));
         } else if t.t == "sym" {

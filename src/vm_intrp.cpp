@@ -27,10 +27,12 @@ std::vector<std::filesystem::path> load_module_table(char*& buf) {
 }
 
 std::vector<std::shared_ptr<eval::instr>> load_code(char*& buf, std::filesystem::path root_path) {
+	auto start = buf;
 	uint64_t num_instrs = *((uint64_t*)buf); buf += sizeof(uint64_t);
 	std::vector<std::shared_ptr<eval::instr>> instrs;
 	for (auto i = 0; i < num_instrs; ++i) {
 		auto op = *buf; buf += 1;
+		std::cout << "offset = " << (buf - start) << std::endl;
 		switch (op) {
 		case 0: /*nop*/ break;
 		case 1: instrs.push_back(std::make_shared<eval::discard_instr>()); break;
@@ -115,11 +117,24 @@ std::vector<std::shared_ptr<eval::instr>> load_code(char*& buf, std::filesystem:
 	return instrs;
 }
 
+#include <Windows.h>
+
 std::vector<std::shared_ptr<eval::instr>> load_file(const std::filesystem::path& path) {
 	try {
-		std::ifstream input(path, std::ios::binary);
-		std::vector<char> buf(std::istream_iterator<char>(input), {});
-		char* pbuf = buf.data();
+		/*std::ifstream input(path, std::ios::binary);
+		std::vector<uint8_t> buf(std::istream_iterator<uint8_t>(input), {});*/
+		auto size = std::filesystem::file_size(path);
+		FILE* f = fopen(path.u8string().data(), "rb+");
+		std::vector<uint8_t> buf(size, 0);
+		fread(buf.data(), sizeof(uint8_t), size, f);
+		fclose(f);
+		std::cout << std::hex;
+		for (auto i = 0; i < buf.size(); ++i) {
+			std::cout << (uint32_t)buf[i] << " ";
+			if (i > 0 && i % 8 == 0) std::cout << std::endl;
+		}
+		std::cout << std::dec << std::endl;
+		char* pbuf = (char*)buf.data();
 		auto code = load_code(pbuf, path.parent_path());
 		return code;
 	}

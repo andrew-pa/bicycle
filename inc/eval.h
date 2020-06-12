@@ -412,7 +412,8 @@ namespace eval {
 		size_t true_branch, false_branch;
 		if_instr(size_t t, size_t f) : true_branch(t), false_branch(f) {}
 		void exec(interpreter* intp) override {
-			auto cond = std::dynamic_pointer_cast<bool_value>(intp->stack.top()); intp->stack.pop();
+			auto val = intp->stack.top();
+			auto cond = std::dynamic_pointer_cast<bool_value>(val); intp->stack.pop();
 			if (cond->value) {
 				intp->go_to_marker(true_branch);
 			}
@@ -540,7 +541,7 @@ namespace eval {
 
 		void exec(interpreter* intp) override {
 			auto fn = std::dynamic_pointer_cast<fn_value>(intp->stack.top()); intp->stack.pop();
-			if(fn->name.has_value()) std::cout << "call to " << fn->name.value() << std::endl;
+			//if(fn->name.has_value()) std::cout << "call to " << fn->name.value() << std::endl;
 			auto fncx = std::make_shared<scope>(fn->closure == nullptr ? intp->global_scope : fn->closure);
 			if (num_args != fn->arg_names.size()) {
 				throw std::runtime_error("expected " + std::to_string(fn->arg_names.size()) +

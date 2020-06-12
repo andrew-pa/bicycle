@@ -55,7 +55,7 @@ mod _emit {
         loop {
             file::write_str(f, path[i]);
             i = i + 1;
-            if i > len break;
+            if i >= len break;
         }
     };
 
@@ -145,7 +145,7 @@ mod _emit {
         } else {
             file::write_u8(f, 0);
         };
-        file::write_u32(f, name);
+        file::write_str(f, name);
     }
 }
 
@@ -187,8 +187,8 @@ fn emit_instrs_to_file(f, instrs) {
     };
     let i = 0;
     loop {
-        table[instrs[i].t](instrs[i]);
         printv(instrs[i]);
+        table[instrs[i].t](instrs[i]);
         i = i + 1;
         if i >= list::length(instrs) break;
     }
