@@ -1,5 +1,6 @@
 #include "..\inc\intrp_std.h"
 #include "intrp_std.h"
+#include <sstream>
 
 std::shared_ptr<eval::value> mk_sys_fn(std::initializer_list<std::string>&& args, std::function<void(eval::interpreter* intrp)> f) {
 	return std::make_shared<eval::fn_value>(std::vector<std::string>(args),
@@ -120,6 +121,12 @@ std::shared_ptr<eval::scope> build_str_api() {
 		auto c = std::dynamic_pointer_cast<eval::int_value>(intrp->current_scope->binding("char"));
 		s->value.append(1, (char)c->value);
 		intrp->stack.push(s);
+	}));
+	mod->bind("to", mk_sys_fn({ "val" }, [](eval::interpreter* intrp) {
+		auto v = intrp->current_scope->binding("val");
+		std::ostringstream oss;
+		v->print(oss);
+		intrp->stack.push(std::make_shared<eval::str_value>(oss.str()));
 	}));
 	return mod;
 }

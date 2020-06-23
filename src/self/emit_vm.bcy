@@ -84,6 +84,12 @@ mod _emit {
         file::write_u32(f, elsem);
     };
 
+    fn if_then_else_abs(f, thenm, elsem) {
+        file::write_u8(f, 51);
+        file::write_u32(f, thenm);
+        file::write_u32(f, elsem);
+    };
+
     fn binary_op(f, op) {
         file::write_u8(f, 12);
         file::write_u8(f, lists::index_of(binary_ops, op));
@@ -150,7 +156,6 @@ mod _emit {
 }
 
 fn emit_instrs_to_file(f, instrs) {
-    file::write_u64(f, list::length(instrs));
     let table = {
         discard: fn(i) _emit::discard(f),
         dup: fn(i) _emit::duplicate(f),
@@ -166,7 +171,7 @@ fn emit_instrs_to_file(f, instrs) {
         enter: fn(i) _emit::enter_scope(f),
         exit: fn(i) _emit::exit_scope(f),
         exit_nm: fn(i) _emit::exit_scope_as_new_module(f, i.name),
-        if_: fn(i) _emit::if_then_else(f, i.thenm, i.elsem),
+        if_: fn(i) _emit::if_then_else_abs(f, i.thenm, i.elsem),
         bop: fn(i) _emit::binary_op(f, i.op),
         lneg: fn(i) _emit::logical_negation(f),
         jmp: fn(i) _emit::jump(f, i.loc),
@@ -186,11 +191,39 @@ fn emit_instrs_to_file(f, instrs) {
         imod: fn(i) _emit::include_module(f, i.name, i.inner_import)
     };
     let i = 0;
+    let offset = 0;
+    let marker_table = {};
+    let ninstrs = [];
     loop {
-        printv(instrs[i]);
-        table[instrs[i].t](instrs[i]);
+        if instrs[i].t == "mrk" {
+            marker_table[str::to(instrs[i].id)] = i - offset;
+            offset = offset + 1;
+        } else {
+            list::append(ninstrs, instrs[i]);
+        };
         i = i + 1;
         if i >= list::length(instrs) break;
+    };
+    printv(marker_table);
+    i = 0;
+    loop {
+        if instrs[i].t == "jmp_mrk" {
+            instrs[i].t = "jmp";
+            instrs[i].loc = marker_table[str::to(instrs[i].id)];
+        } else if instrs[i].t == "if_" {
+            instrs[i].thenm = marker_table[str::to(instrs[i].thenm)];
+            instrs[i].elsem = marker_table[str::to(instrs[i].elsem)];
+        };
+        i = i + 1;
+        if i >= list::length(ninstrs) break;
+    };
+    file::write_u64(f, list::length(ninstrs));
+    i = 0;
+    loop {
+        printv(ninstrs[i]);
+        table[ninstrs[i].t](ninstrs[i]);
+        i = i + 1;
+        if i >= list::length(ninstrs) break;
     }
 }
 

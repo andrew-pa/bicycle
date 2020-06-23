@@ -244,9 +244,9 @@ namespace eval {
 				out << "&";
 			}
 			out << std::endl;
-			for (auto i : body) {
-				out << "\t";
-				i->print(out);
+			for (auto i = 0; i < body.size(); ++i) {
+				out << i << "\t";
+				body[i]->print(out);
 			}
 		}
 
@@ -407,6 +407,21 @@ namespace eval {
 	};
 
 
+	struct if_abs_instr : public instr {
+		size_t true_branch, false_branch;
+		if_abs_instr(size_t t, size_t f) : true_branch(t), false_branch(f) {}
+		void exec(interpreter* intp) override {
+			auto val = intp->stack.top();
+			auto cond = std::dynamic_pointer_cast<bool_value>(val); intp->stack.pop();
+			if (cond->value) {
+				intp->pc = true_branch - 1;
+			}
+			else {
+				intp->pc = false_branch - 1;
+			}
+		}
+		void print(std::ostream& out) override { out << "ifa then " << true_branch << " else " << false_branch << std::endl; }
+	};
 
 	struct if_instr : public instr {
 		size_t true_branch, false_branch;
@@ -523,9 +538,9 @@ namespace eval {
 				if (i + 1 < arg_names.size()) out << ", ";
 			}
 			out << ")" << std::endl;
-			for (auto i : body) {
-				out << "\t";
-				i->print(out);
+			for (auto i = 0; i < body.size(); ++i) {
+				out << i << "\t";
+				body[i]->print(out);
 			}
 			out << std::endl;
 		}
@@ -548,7 +563,8 @@ namespace eval {
 					" arguments but only got " + std::to_string(num_args));
 			}
 			for (auto an : fn->arg_names) {
-				if (intp->stack.empty()) throw std::runtime_error("expected more arguments for fn call, stack bottomed out");
+				if (intp->stack.empty())
+					throw std::runtime_error("expected more arguments for fn call, stack bottomed out");
 				fncx->bind(an, intp->stack.top()); intp->stack.pop();
 			}
 			interpreter fn_intp(fncx, fn->body);
